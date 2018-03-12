@@ -1,0 +1,17 @@
+---
+# Contains the configuration for base squid kit.
+instance_groups:
+- name: squid
+  jobs:
+    - name: squid
+      release: squid
+      properties:
+        port: (( grab params.port ))
+        acl: (( grab params.acl ))
+
+releases:
+- name: squid
+  version: 1.0.0
+  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.0.0/squid-1.0.0.tgz
+  sha1: f60eb6db3a56db7049272e319d5129137f17952f
+

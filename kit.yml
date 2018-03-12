@@ -1,0 +1,20 @@
+---
+name: squid
+version: 0.0.1
+author: Charlie Baum <charlie_baum@cable.comcast.com>
+homepage: https://github.com/cloudfoundry-community/squid-boshrelease
+github: https://github.com/genesis-community/squid-genesis-kit
+
+genesis_min_version: 2.5.0
+
+features: []
+
+params:
+  base: []
+
+credentials:
+  base: {}
+
+certificates:
+  base: {}
+

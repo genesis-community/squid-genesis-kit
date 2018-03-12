@@ -1,0 +1,30 @@
+---
+# Contains the instance_groups in install order, as well as the stemcells and
+# update stanzas for the base squid kit.
+instance_groups:
+- name: squid
+  instances: 1
+  azs: (( grab params.availability_zones || meta.default.azs ))
+  stemcell: default
+  networks:
+  - name: (( grab params.network ))
+    static_ips: (( static_ips(0) ))
+  vm_type: (( grab params.vm_type ))
+  update:
+    max_in_flight: 1
+
+stemcells:
+- alias: default
+  os: (( grab params.stemcell_os ))
+  version: (( grab params.stemcell_version ))
+
+meta:
+  vault: (( concat "secret/" params.vault ))
+
+update:
+  serial: false
+  canaries: 1
+  canary_watch_time: 30000-600000
+  update_watch_time: 5000-600000
+  max_in_flight: 1
+  max_errors: 1
