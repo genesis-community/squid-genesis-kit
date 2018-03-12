@@ -1,0 +1,10 @@
+---
+kit:
+  features: []
+
+params:
+  env:   ci-baseline
+  vault: genesis-ci/squid/ci/baseline
+  bosh:  genesis-ci
+
+  network: genesis-ci-squid
