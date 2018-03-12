@@ -38,7 +38,7 @@ genesis secrets --vault da-vault add ci-baseline
 genesis deploy -n ci-baseline
 $BOSH -d ci-baseline-squid instances --ps
 header "Validating BASELINE squid proxy..."
-(export http_proxy=http://...:3128
- export https_proxy=https://...:3128
+(export http_proxy=http://10.200.252.16:3128
+ export https_proxy=http://10.200.252.16:3128
  curl -I https://google.com)
 cleanup ci-baseline-squid
