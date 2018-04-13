@@ -29,17 +29,22 @@ Once deployed, you can add http_proxy: and https_proxy: params to your manifest 
 Heads Up!!
 -------
 The use of the http_proxy and https_proxy parameters in your manifests will require active management of the no_proxy parameter otherwise ALL traffic will forwared through the proxy and that is rarely ideal. A great example of this is defining a proxy for your bosh director.  If your bosh genesis kit manifest looks like this:
+
+```
 params:
   static_ip: 10.10.100.1
   http_proxy: http://proxyIP:3128
-  https_proxy: http://proxyIP:3128 
+  https_proxy: http://proxyIP:3128
+```
 
 All traffic such as uploading stemcells and releases which is TCP traffic to the local blobstore, will be sent through the proxy and can cause issues. There is no reason for local traffic within a bosh VM to leave that VM. Instead, your bosh genesis kit manifest should look like this:
+```
 params:
   static_ip: 10.10.100.1
   http_proxy: http://proxyIP:3128
   https_proxy: http://proxyIP:3128
   no_proxy: 10.10.100.1, 127.0.0.1
+```
 
 Any traffic bound for the local bosh host will ignore the defined proxy settings.
 
