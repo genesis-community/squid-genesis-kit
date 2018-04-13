@@ -5,20 +5,7 @@ This is a genesis kit for [Squid Proxy](http://www.squid-cache.org/).  This kit 
 
 Generally this will be used to allow egress internet traffic for deployments that are in network zones that have restricted or no outside access.  The squid proxy has to be deployed to a network zone that has unrestricted access to where the deployments need to go. This is very useful (and necessary) for example for Cloud Foundry deployments that are in restricted or compliance networks to enable Cloud Foundry to get stemcell updates and release updates when the only way out to these public resources is through a proxy.   
 
-Please note the use of the http_proxy and https_proxy parameters in your manifests will require active management of the no_proxy parameter otherwise ALL traffic will forwared through the proxy and that is rarely ideal. A great example of this is defining a proxy for your bosh director.  If your bosh genesis kit manifest looks like this:
-params:
-  static_ip: 10.10.100.1
-  http_proxy: http://proxyIP:3128
-  https_proxy: http://proxyIP:3128 
 
-All traffic such as uploading stemcells and releases which is TCP traffic to the local blobstore, will be sent through the proxy and can cause issues. There is no reason for local traffic within a bosh VM to leave that VM. Instead, your bosh genesis kit manifest should look like this:
-params:
-  static_ip: 10.10.100.1
-  http_proxy: http://proxyIP:3128
-  https_proxy: http://proxyIP:3128
-  no_proxy: 10.10.100.1, 127.0.0.1
-
-Any traffic bound for the local bosh host will ignore the defined proxy settings.
 
 Quick Start
 -----------
@@ -37,19 +24,31 @@ genesis init --kit squid/1.0.0
 genesis init --kit squid -d my-squid-configs
 ```
 
-Once created, refer to the deployment repo's README for information on creating
+Once deployed, you can add http_proxy: and https_proxy: params to your manifest to utilize the proxy.
 
-Features
+Heads Up!!
 -------
+The use of the http_proxy and https_proxy parameters in your manifests will require active management of the no_proxy parameter otherwise ALL traffic will forwared through the proxy and that is rarely ideal. A great example of this is defining a proxy for your bosh director.  If your bosh genesis kit manifest looks like this:
+params:
+  static_ip: 10.10.100.1
+  http_proxy: http://proxyIP:3128
+  https_proxy: http://proxyIP:3128 
 
-FIXME: The kit author should have filled this in with details
-about what features are defined, and how they affect the deployment. But they
-have not, and that is sad. Perhaps a GitHub issue should be opened to remind
-them of this?
+All traffic such as uploading stemcells and releases which is TCP traffic to the local blobstore, will be sent through the proxy and can cause issues. There is no reason for local traffic within a bosh VM to leave that VM. Instead, your bosh genesis kit manifest should look like this:
+params:
+  static_ip: 10.10.100.1
+  http_proxy: http://proxyIP:3128
+  https_proxy: http://proxyIP:3128
+  no_proxy: 10.10.100.1, 127.0.0.1
+
+Any traffic bound for the local bosh host will ignore the defined proxy settings.
+
+
 
 Params
 ------
 
+```
 params.port: 3128
   
 params.acl: |
@@ -73,6 +72,7 @@ params.acl: |
     http_access deny !Safe_ports
     http_access deny CONNECT !SSL_ports
     http_access allow localnet
+```
 
 Cloud Config
 ------------
