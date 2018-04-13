@@ -43,7 +43,7 @@ params:
   static_ip: 10.10.100.1
   http_proxy: http://proxyIP:3128
   https_proxy: http://proxyIP:3128
-  no_proxy: 10.10.100.1, 127.0.0.1
+  no_proxy: 10.10.100.1,127.0.0.1
 ```
 
 Any traffic bound for the local bosh host will ignore the defined proxy settings.
