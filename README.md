@@ -30,7 +30,7 @@ params:
   http_proxy:
   https_proxy:
 ```
-params to your manifest to utilize the proxy.
+to your manifest to utilize the proxy.
 
 Heads Up!!
 -------
