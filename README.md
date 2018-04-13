@@ -26,8 +26,9 @@ genesis init --kit squid -d my-squid-configs
 
 Once deployed, you can add 
 ```
-http_proxy:
-https_proxy:
+params:
+  http_proxy:
+  https_proxy:
 ```
 params to your manifest to utilize the proxy.
 
