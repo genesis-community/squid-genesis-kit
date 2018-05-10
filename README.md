@@ -1,9 +1,10 @@
 squid Genesis Kit
 =================
 
-FIXME: The kit author should have filled this in with details about
-what this is, and what it provides. But they have not, and that is sad.
-Perhaps a GitHub issue should be opened to remind them of this?
+The **Squid Proxy Genesis Kit** deploys a Squid HTTP/HTTPS proxy
+which you (and your deployments) can use for accessing HTTP
+resources on other networks, like the public Internet, without
+having direct access.
 
 Quick Start
 -----------
@@ -24,29 +25,23 @@ genesis init --kit squid -d my-squid-configs
 
 Once created, refer to the deployment repo's README for information on creating
 
-Features
--------
-
-FIXME: The kit author should have filled this in with details
-about what features are defined, and how they affect the deployment. But they
-have not, and that is sad. Perhaps a GitHub issue should be opened to remind
-them of this?
-
-Params
-------
-
-FIXME: The kit author should have filled this in with details about the params
-present in the base kit, as well as each feature defined. These should likely
-be in different sections (one for base, one per feature). Unfortunately,
-the author has not done this, and that is sad. Perhaps a GitHub issue
-should be opened to remind them of this?
-
 Cloud Config
 ------------
 
-FIXME: The kit author should have filled in this section with details about
-what cloud config definitions this kit expects to see in play and how to
-override them. Also useful are hints at default values for disk + vm sizing,
-scaling considerations, and other miscellaneous IaaS components that the deployment
-might require, like load balancers.
+By default, Squid uses the following VM types/networks from your
+cloud config. Feel free to override them in your environment, if
+you would rather they use entities already existing in your cloud
+config:
 
+```
+params:
+  network: squid
+  vm_type: default
+```
+
+Learn More
+----------
+
+For more in-depth documentation, check out the [manual][1].
+
+[1]: MANUAL.md

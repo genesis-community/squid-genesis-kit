@@ -1,0 +1,38 @@
+#!/bin/bash
+set -eu
+
+proxy=$(exodus http_proxy)
+
+list() {
+  echo "The following addons are defined:"
+  echo
+  echo "  curl   Issue raw HTTP requests (via curl) through"
+  echo "         the Squid proxy, to test reachability."
+  echo
+}
+
+case $GENESIS_ADDON_SCRIPT in
+list)
+  list
+  exit 0
+  ;;
+
+curl)
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "  !!! install curl first!"
+  else
+    export http_proxy=$proxy
+    export https_proxy=$proxy
+    echo >&2 "http_proxy=$http_proxy"
+    echo >&2 "https_proxy=$https_proxy"
+    echo >&2
+    exec curl "$@"
+  fi
+  ;;
+
+*)
+  echo "Unrecognized Squid Genesis Kit addon."
+  list
+  exit 1
+  ;;
+esac
