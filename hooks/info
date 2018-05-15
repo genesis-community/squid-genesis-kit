@@ -2,13 +2,7 @@
 set -eu
 
 proxy=$(exodus http_proxy)
-    echo "----------------------------------------------------"
-    echo "$GENESIS_ENVIRONMENT Squid Proxy"
-    echo
 describe "environment variables"
     echo
     echo "  export http_proxy=$proxy"
     echo "  export https_proxy=$proxy"
-    echo
-    echo "----------------------------------------------------"
-    echo
