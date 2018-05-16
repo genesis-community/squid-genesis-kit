@@ -25,20 +25,6 @@ genesis init --kit squid -d my-squid-configs
 
 Once created, refer to the deployment repo's README for information on creating
 
-Cloud Config
-------------
-
-By default, Squid uses the following VM types/networks from your
-cloud config. Feel free to override them in your environment, if
-you would rather they use entities already existing in your cloud
-config:
-
-```
-params:
-  network: squid
-  vm_type: default
-```
-
 Learn More
 ----------
 

@@ -32,6 +32,19 @@ having direct access.
   proxy, so availability zone configuration will not bring high
   availability to the deployment.
 
+# Cloud Configuration
+
+By default, Squid uses the following VM types/networks from your
+cloud config. Feel free to override them in your environment, if
+you would rather they use entities already existing in your cloud
+config:
+
+```
+params:
+  network: squid
+  vm_type: default
+```
+
 # Available Addons
 
 - `curl` - Test HTTP/HTTPS access, through the deployed proxy,
