@@ -1,0 +1,8 @@
+#!/bin/bash
+set -eu
+
+proxy=$(exodus http_proxy)
+describe "environment variables"
+    echo
+    echo "  export http_proxy=$proxy"
+    echo "  export https_proxy=$proxy"
