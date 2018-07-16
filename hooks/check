@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Cloud Config checks
+if [[ -n "$GENESIS_CLOUD_CONFIG" ]] ; then
+  if ! want_feature proto; then
+    cloud_config_needs vm_type    $(lookup params.vm_type default)
+    cloud_config_needs network    $(lookup params.network squid)
+    check_cloud_config && describe "  cloud-config [#G{OK}]"
+  fi
+fi

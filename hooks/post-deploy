@@ -1,0 +1,18 @@
+#!/bin/bash
+set -eu
+
+if [[ $GENESIS_DEPLOY_RC == 0 ]]; then
+
+      echo; echo;
+  describe "#M{$GENESIS_ENVIRONMENT} Squid Proxy deployed!"
+      echo
+      echo "For details about the deployment, run"
+      echo
+  describe "  #G{genesis info $GENESIS_ENVIRONMENT}"
+      echo
+      echo "To test the proxy, run"
+      echo
+  describe "  #G{genesis do $GENESIS_ENVIRONMENT -- curl https://www.google.com}"
+      echo
+
+fi

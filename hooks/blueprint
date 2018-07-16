@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu
+
+validate_features # no features...
+echo manifests/squid.yml
