@@ -23,6 +23,12 @@ having direct access.
 - `network` - What network to deploy Squid into.  This network
   must be defined in your cloud config.  Defaults to `squid`.
 
+- `stemcell_os` - The operating system stemcell you want to
+  deploy on. (default: `ubuntu-xenial`)
+
+- `stemcell_version` - The specific version of the stemcell you
+  want to deploy on. (default: `latest`)
+
 - `availability_zones` - What BOSH HA availability zones to deploy
   the proxy across.  The chosen network must have at least one
   subnet in each of the listed zones, and the zones themselves
