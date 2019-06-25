@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eu
+KIT=squid
 
 header() {
 	echo
@@ -21,28 +22,26 @@ cleanup() {
 	done
 }
 
-header "Validating BOSH_* environment variables..."
-set | grep BOSH_ || true
-
 header "Checking previous deployments on ${BOSH_ENVIRONMENT}..."
 $BOSH deployments
 
 header "Cleaning up from any previous deployments (if necessary)..."
-cleanup ci-baseline-squid
-safe rm -rf secret/genesis-ci/squid
-safe cp -rf secret/genesis-ci/static/squid secret/genesis-ci/squid/ci/baseline
-safe cp -rf secret/genesis-ci/static/squid secret/genesis-ci/squid/ci/proto
+cleanup ci-baseline-${KIT}
+safe rm -rf secret/ci/baseline/${KIT}
 
 header "Deploying BASELINE environment to verify functionality..."
 cd dev
-genesis compile-kit --name prometheus -v 9.9.9 --force # make sure hooks are executable before screaming at shipit for failing.
+# make sure hooks are executable before screaming at shipit for failing.
+genesis compile-kit --name $KIT -v 9.9.9 --force
 cd ..
-genesis secrets add ci-baseline
-genesis deploy -n ci-baseline
-$BOSH -d ci-baseline-squid instances --ps
-header "Validating BASELINE squid proxy..."
-IP=$($BOSH -d ci-baseline-squid vms --json | jq -r '.Tables[0].Rows[0].ips')
+genesis add-secrets ci-baseline
+genesis deploy -y ci-baseline
+$BOSH -d ci-baseline-${KIT} instances --ps
+
+header "Validating BASELINE environment..."
+IP=$($BOSH -d ci-baseline-${KIT} vms --json | jq -r '.Tables[0].Rows[0].ips')
 (export http_proxy=http://$IP:3128
  export https_proxy=http://$IP:3128
  curl -I https://google.com)
-cleanup ci-baseline-squid
+
+cleanup ci-baseline-${KIT}
