@@ -59,9 +59,9 @@ update:
 
 releases:
 - name: squid
-  version: 1.0.1
-  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.0.1/squid-1.0.1.tgz
-  sha1: bd28cfc01da93ac310029253abf2caf06b41a9bd
+  version: 1.1.0
+  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
+  sha1:    61848d550902a159efdc6f3e2d24291d53d65b76
 
 stemcells:
 - alias:   default
