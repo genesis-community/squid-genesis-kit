@@ -6,4 +6,4 @@ author:  Charlie Baum <charlie_baum@cable.comcast.com>
 docs:    https://github.com/cloudfoundry-community/squid-boshrelease
 code:    https://github.com/genesis-community/squid-genesis-kit
 
-genesis_min_version: 2.6.0
+genesis_version_min: 2.7.0

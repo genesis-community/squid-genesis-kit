@@ -7,7 +7,6 @@ echo "kit:"
 echo "  name:    $GENESIS_KIT_NAME"
 echo "  version: $GENESIS_KIT_VERSION"
 
-echo "params:"
-echo "  env: $GENESIS_ENVIRONMENT"
+genesis_config_block
 
 ) >$GENESIS_ROOT/$GENESIS_ENVIRONMENT.yml
