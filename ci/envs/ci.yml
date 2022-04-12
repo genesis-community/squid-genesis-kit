@@ -1,6 +1,8 @@
 ---
 kit:
   name: dev
+  version: latest
+  features: []
 
 params:
   availability_zones: [z1]

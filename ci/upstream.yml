@@ -1,7 +1,4 @@
----
-# This file contains patterns for generating links to upstream release notes,
-# for constituent releases.
-
-core:
-  - name:  squid
-    notes: https://github.com/cloudfoundry-community/squid-boshrelease/releases/tag/v${version}
+sections:
+  - name:  releases
+    label: Releases
+    default: true

@@ -1,0 +1,7 @@
+---
+kit:
+  features: []
+
+genesis:
+  env:   ci-gcp-baseline
+

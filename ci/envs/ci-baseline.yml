@@ -1,7 +1,0 @@
----
-kit:
-  features: []
-
-params:
-  env:   ci-baseline
-  bosh:  genesis-ci
