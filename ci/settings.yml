@@ -7,7 +7,7 @@ meta:
   iaas:            gcp
   exposed:         false
   version_file:    version
-  initial_version: 1.2.0
+  initial_version: 0.2.0
 
   # upstream:
   #   package:  cf-deployment
