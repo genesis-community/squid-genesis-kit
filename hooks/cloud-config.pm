@@ -40,6 +40,9 @@ sub perform {
               'net_id' => $self->network_reference('id'),
               'security_groups' => ['default'],
             },
+            aws => {
+              'subnet' => $self->network_reference('id'),
+            },
           },
         },
       )
@@ -57,6 +60,20 @@ sub perform {
               'size' => 32 # in gigabytes
             },
           },
+          aws => {
+            'instance_type' => $self->for_scale({
+              dev => 't3.medium',
+              prod => 'm6i.large'
+            }, 't3.medium'),
+            'ephemeral_disk' => {
+              'size' => 16384, # 16GB in MB
+              'type' => 'gp3',
+              'encrypted' => $self->TRUE
+            },
+            'metadata_options' => {
+              'http_tokens' => 'required'
+            }
+          },
         },
       ),
     ],
@@ -64,13 +81,26 @@ sub perform {
       $self->disk_type_definition('squid',
         common => {
           disk_size => $self->for_scale({
-            dev => gigabytes(32),
-            prod => gigabytes(64)
-          }, gigabytes(32)),
+            dev => 32768, # 32GB in MB
+            prod => 32768  # 32GB in MB
+          }, 32768),
         },
         cloud_properties_for_iaas => {
           openstack => {
             'type' => 'storage_premium_perf6',
+          },
+          aws => {
+            'type' => 'gp3',
+            'encrypted' => $self->TRUE
+          },
+        },
+      ),
+    ],
+    'vm_extensions' => [
+      $self->vm_extension_definition('squid-lb',
+        cloud_properties_for_iaas => {
+          aws => {
+            'lb_target_groups' => ['ocfp-ocf-squid-lb-tg'],
           },
         },
       ),
