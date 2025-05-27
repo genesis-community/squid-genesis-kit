@@ -50,7 +50,7 @@ sub perform {
     info("Curl command failed with exit code $curl_rc: $curl_err");
   }
 
-  return $self->done($curl_rc == 0);
+  return $self->done()
 }
 
 1;

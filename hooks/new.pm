@@ -45,7 +45,7 @@ sub perform {
     info("Note: Editor exited with non-zero status: $editor_rc");
   }
 
-  return $self->done(1);
+  return $self->done();
 }
 
 1;

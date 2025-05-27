@@ -27,7 +27,7 @@ sub perform {
   open(my $fh, ">", $data_file) or return $self->done(0);
   close($fh);
 
-  return $self->done(1);
+  return $self->done();
 }
 
 1;

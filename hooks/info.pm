@@ -34,7 +34,7 @@ sub perform {
     "\texport https_proxy=$proxy\n"
   );
 
-  return $self->done(1);
+  return $self->done();
 }
 
 1;
