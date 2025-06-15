@@ -1,0 +1,52 @@
+vm_types:
+- cloud_properties:
+    ephemeral_disk:
+      encrypted: true
+      size: 16384
+      type: gp3
+    instance_type: m6i.large
+    metadata_options:
+      http_tokens: required
+  name: squid-prod
+disk_types:
+- cloud_properties:
+    encrypted: true
+    type: gp3
+  disk_size: 32768
+  name: squid-prod
+networks:
+- name: ocfp-int-sbx-us-east-1-ocf
+  subnets:
+  - az: ocfp-int-sbx-us-east-1-z1
+    cloud_properties:
+      subnet: subnet-00e64e3349b8293d6
+    dns:
+    - 10.139.130.2
+    gateway: 10.139.130.1
+    range: 10.139.130.0/26
+    reserved:
+    - 10.139.130.0-10.139.130.31
+  - az: ocfp-int-sbx-us-east-1-z2
+    cloud_properties:
+      subnet: subnet-00b004b349c61d454
+    dns:
+    - 10.139.130.2
+    gateway: 10.139.130.65
+    range: 10.139.130.64/26
+    reserved:
+    - 10.139.130.64-10.139.130.96
+  - az: ocfp-int-sbx-us-east-1-z3
+    cloud_properties:
+      subnet: subnet-0661a846311a4bd0c
+    dns:
+    - 10.139.130.2
+    gateway: 10.139.130.129
+    range: 10.139.130.128/26
+    reserved:
+    - 10.139.130.128-10.139.130.160
+  type: manual
+vm_extensions:
+- cloud_properties:
+    lb_target_groups:
+    - ocfp-ocf-squid-lb-tg
+  name: squid-lb
