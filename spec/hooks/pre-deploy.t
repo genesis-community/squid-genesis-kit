@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 # Proves that the pre-deploy hook checks the merged manifest of a deploy,
 # which is the last place an ops file can override the stemcells, the bpm
-# release, or the squid release.
+# release, or the squid release.  The kit supports ubuntu-noble and later,
+# and it deploys squid 2.0.0 on every stemcell.
 #
 # Each case writes a small manifest, points GENESIS_MANIFEST_FILE at it, and
 # runs both of the hook's checks.  spruce converts the manifest, as it does in
@@ -74,16 +75,47 @@ like($error, qr/chpst/, 'the refusal says why');
 ($ok, $error) = check(stemcell('ubuntu-resolute') . squid('1.1.0'), 0);
 ok(!$ok, 'squid 1.1.0 on resolute is refused without the feature too');
 
-($ok, $error) = check(stemcell('ubuntu-xenial') . squid('1.1.0'), 0);
-ok($ok, 'the default squid 1.1.0 on xenial passes') or diag($error);
+($ok, $error) = check(stemcell('ubuntu-noble') . squid('2.0.0'), 0);
+ok($ok, 'the default squid 2.0.0 on noble passes') or diag($error);
+
+($ok, $error) = check(stemcell('ubuntu-noble') . squid('1.1.0'), 0);
+ok(!$ok, 'squid 1.1.0 on noble is refused');
+like($error, qr/chpst/, 'the refusal says why');
+like($error, qr/loopback/, 'the refusal names the missing deny rules');
+
+($ok, $error) = check(stemcell('ubuntu-noble-fips') . squid('1.2.0-rc.3'), 0);
+ok(!$ok, 'squid 1.2.0-rc.3 on a noble FIPS stemcell is refused');
+
+($ok, $error) = check(stemcell('some-custom-os') . squid('1.1.0'), 0);
+ok(!$ok, 'squid 1.1.0 is refused on a stemcell the checks do not know');
+
+($ok, $error) = check(squid('1.1.0'), 0);
+ok(!$ok, 'squid 1.1.0 is refused when the manifest lists no stemcells');
 
 ($ok, $error) = check(stemcell('ubuntu-xenial') . squid('2.0.0+dev.1'), 0);
 ok(!$ok, 'squid 2.0.0 on xenial is refused');
-like($error, qr/C\+\+17/, 'the refusal says why');
+like($error, qr/does\s+not\s+compile\s+on\s+trusty,\s+xenial,\s+or\s+bionic/, 'the refusal says why');
 like($error, qr/ubuntu-xenial/, 'the refusal names the stemcell');
+like($error, qr/ubuntu-noble and later/, 'the refusal names the supported series');
+
+($ok, $error) = check(stemcell('ubuntu-xenial') . squid('1.1.0'), 0);
+ok(!$ok, 'the old default, squid 1.1.0 on xenial, is refused');
 
 ($ok, $error) = check(stemcell('ubuntu-jammy') . squid('2.0.0'), 0);
-ok($ok, 'squid 2.0.0 on jammy passes') or diag($error);
+ok(!$ok, 'squid 2.0.0 on jammy is refused');
+like($error, qr/ubuntu-jammy/, 'the refusal names the stemcell');
+
+($ok, $error) = check(stemcell('ubuntu-jammy-fips') . squid('2.0.0'), 0);
+ok(!$ok, 'squid 2.0.0 on a jammy FIPS stemcell is refused');
+
+($ok, $error) = check(stemcell('ubuntu-bionic') . squid('2.0.0'), 0);
+ok(!$ok, 'squid 2.0.0 on bionic is refused');
+
+($ok, $error) = check(stemcell('ubuntu-trusty') . squid('2.0.0'), 0);
+ok(!$ok, 'squid 2.0.0 on trusty is refused');
+
+($ok, $error) = check(stemcell('ubuntu-jammy-next') . squid('2.0.0'), 0);
+ok($ok, 'an os that only starts with ubuntu-jammy is not jammy') or diag($error);
 
 ($ok, $error) = check(stemcell('ubuntu-resolute') . squid('latest'), 1);
 ok(!$ok, 'squid latest on resolute is refused');
@@ -122,6 +154,12 @@ like($error, qr/bosh-aws-xen-hvm-ubuntu-xenial-go_agent/, 'the refusal names the
 
 ($ok, $error) = check(named('bosh-aws-xen-hvm-ubuntu-noble-go_agent') . squid('2.0.0'), 1);
 ok(!$ok, 'a noble stemcell named without an os is refused with the feature');
+
+($ok, $error) = check(named('bosh-aws-xen-hvm-ubuntu-noble-go_agent') . squid('2.0.0'), 0);
+ok($ok, 'a noble stemcell named without an os passes without the feature') or diag($error);
+
+($ok, $error) = check(named('bosh-aws-xen-hvm-ubuntu-jammy-go_agent') . squid('2.0.0'), 0);
+ok(!$ok, 'squid 2.0.0 on a jammy stemcell named without an os is refused');
 
 # The series is matched whole, so a longer os name never matches it, while a
 # FIPS stemcell counts as its series.
@@ -198,15 +236,17 @@ like($error, qr/not a\s+version/, 'the refusal says the version is not understoo
 ($ok, $error) = check(stemcell('ubuntu-resolute') . squid('latest'), 1);
 like($error, qr/release .*latest.*Pin it to a version/s, 'squid latest gets its own message');
 
-($ok, $error) = check(stemcell('ubuntu-xenial') . squid('latest'), 0);
-ok(!$ok, 'squid latest on xenial is refused without the feature');
+($ok, $error) = check(stemcell('ubuntu-noble') . squid('latest'), 0);
+ok(!$ok, 'squid latest on noble is refused without the feature');
+like($error, qr/Pin it to a version/, 'the refusal says to pin it');
+
+($ok, $error) = check(stemcell('ubuntu-noble') . "releases:\n- name: squid\n", 0);
+ok(!$ok, 'a squid release without a version on noble is refused');
 
 ($ok, $error) = check(stemcell('ubuntu-resolute') . "releases:\n- name: squid\n", 1);
 ok(!$ok, 'a squid release without a version is refused');
 like($error, qr/without a version/, 'the refusal says the version is missing');
 
-($ok, $error) = check(stemcell('ubuntu-jammy') . squid('latest'), 0);
-ok($ok, 'squid latest on jammy is not checked') or diag($error);
 
 # bpm without a version, at latest, and as a release candidate.
 ($ok, $error) = check(stemcell('ubuntu-resolute') . squid('2.0.0') . "- name: bpm\n", 1);
@@ -220,8 +260,8 @@ like($error, qr/bpm .*latest/, 'the refusal names latest');
 ($ok, $error) = check(stemcell('ubuntu-resolute') . squid('2.0.0') . "- name: bpm\n  version: 1.4.41-rc.1\n", 1);
 ok(!$ok, 'bpm 1.4.41-rc.1 on resolute is refused, because a candidate comes before the fix');
 
-($ok, $error) = check(stemcell('ubuntu-xenial') . squid('1.1.0') . "- name: bpm\n  version: 1.4.22\n", 0);
-ok($ok, 'an old bpm on xenial is not checked') or diag($error);
+($ok, $error) = check(stemcell('ubuntu-noble') . squid('2.0.0') . "- name: bpm\n  version: 1.4.22\n", 0);
+ok($ok, 'an old bpm on noble is not checked') or diag($error);
 
 # The success line.
 {

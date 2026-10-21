@@ -1,10 +1,9 @@
 ---
-# squid 1.1.0 builds Squid 4.10 and starts it with chpst.  It stays the
-# default, because Squid 7 in squid 2.0.0 needs a C++17 compiler, which the
-# default ubuntu-xenial stemcell does not have.  The resolute feature swaps in
-# squid 2.0.0 through manifests/releases/squid-resolute.yml.
+# squid 2.0.0 builds Squid 7.7 and starts it with setpriv.  Squid 7 needs a
+# C++17 compiler, which the noble and resolute stemcells have.  The release is
+# pinned with its url and sha1, so BOSH downloads it during the deploy.
 releases:
 - name:    squid
-  version: 1.1.0
-  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
-  sha1:    61848d550902a159efdc6f3e2d24291d53d65b76
+  version: 2.0.0
+  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v2.0.0/squid-2.0.0.tgz
+  sha1:    6013e6be18500378c2f0aab7170a25853d287dc5

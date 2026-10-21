@@ -68,7 +68,7 @@ params:
 
 ## Stemcells
 
-The kit deploys on the `ubuntu-xenial` stemcell with squid 1.1.0 by default. To deploy on `ubuntu-resolute`, turn on the `resolute` feature, which also swaps in squid 2.0.0, a release that builds Squid 7.7. The [manual](MANUAL.md#resolute) explains why the two go together.
+The kit deploys on the `ubuntu-noble` stemcell by default, with squid 2.0.0, a release that builds Squid 7.7. It supports noble and later, and it no longer supports xenial. To deploy on `ubuntu-resolute`, turn on the `resolute` feature, which changes only the stemcell. Upgrading from version 1.x of the kit recreates the proxy's VM, and the [manual](MANUAL.md#upgrading-from-version-1x) explains what else changes.
 
 ## Heads up
 

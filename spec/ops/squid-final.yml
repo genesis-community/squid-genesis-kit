@@ -1,7 +1,7 @@
 ---
 # Stands in for a deployment repo's ops file that pins a final squid
-# release by its own feature name, which must win over the resolute pin,
-# url and sha1 included.
+# release by its own feature name, which must win over the kit's pin, url
+# and sha1 included, when the resolute feature is on too.
 releases:
 - name:    squid
   version: 2.0.1

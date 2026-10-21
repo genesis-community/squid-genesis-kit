@@ -4,7 +4,7 @@
 
 The Squid Proxy Genesis Kit deploys a single Squid HTTP and HTTPS proxy. Your deployments can use it to reach HTTP resources on other networks, such as the public Internet, when they have no direct access of their own. It's most useful in compliance-driven environments, where direct Internet access is limited or forbidden and the proxy becomes the one controlled egress point.
 
-The kit needs Genesis 3.1.0 or later.
+The kit needs Genesis 3.1.0 or later. It deploys squid release 2.0.0, which builds Squid 7.7, on the `ubuntu-noble` stemcell by default, and it supports noble and later. If you're upgrading an environment from version 1.x of the kit, read [Upgrading from version 1.x](#upgrading-from-version-1x) first, because the upgrade recreates the proxy's VM.
 
 ## Parameters
 
@@ -30,7 +30,7 @@ The kit needs Genesis 3.1.0 or later.
 
 - `stemcell_os`
 
-  The stemcell operating system. It defaults to `ubuntu-xenial`. To deploy on `ubuntu-resolute`, turn on the `resolute` feature instead of setting this parameter, because the feature also changes the squid release.
+  The stemcell operating system. It defaults to `ubuntu-noble`. The kit supports noble and later, so it refuses `ubuntu-trusty`, `ubuntu-xenial`, `ubuntu-bionic`, and `ubuntu-jammy`, and their FIPS forms, when it builds the manifest. To deploy on `ubuntu-resolute`, turn on the `resolute` feature instead of setting this parameter.
 
 - `stemcell_version`
 
@@ -54,21 +54,37 @@ The feature resolves the subnet's AZ the same way the cloud-config hook does, so
 
 ### resolute
 
-The `resolute` feature deploys the proxy on the `ubuntu-resolute` stemcell. It sets `params.stemcell_os` to `ubuntu-resolute`, and it swaps the squid release from 1.1.0 to 2.0.0.
-
-We need the new release because squid 1.1.0 starts Squid with `chpst`, which comes with runit, and the resolute stemcell no longer ships runit. squid 2.0.0 builds Squid 7.7 and starts it with `setpriv` from util-linux instead. Squid 7 needs a C++17 compiler, which the default xenial stemcell doesn't have, so xenial deployments stay on squid 1.1.0.
+The `resolute` feature deploys the proxy on the `ubuntu-resolute` stemcell. It sets `params.stemcell_os` to `ubuntu-resolute`, and that's all it changes, because the noble and resolute stemcells run the same squid release.
 
 The kit refuses an environment that turns the feature on while setting `params.stemcell_os` to another os. It also refuses one that sets `params.stemcell_os` to `ubuntu-resolute` without the feature, and the message tells you to enable the feature and remove the parameter.
 
-The feature pins squid 2.0.0 with its GitHub url and sha1, so BOSH downloads the release during the deploy.
+Moving an existing environment from noble to the resolute feature changes the stemcell, so BOSH recreates the proxy's VM, and the proxy is down while it does.
 
-Moving an existing environment from xenial to the resolute feature changes the stemcell, so BOSH recreates the proxy's VM, and nothing from squid 1.1.0 is left running on it.
-
-The deployment repo's ops files load after all of the kit's own files, in the order that the features list them. That includes `ops/resolute.yml`, which still applies when the feature is on. So an ops file can change the stemcell, or pin another squid release, and its pin wins over the one that the feature sets.
+The deployment repo's ops files load after all of the kit's own files, in the order that the features list them. That includes `ops/resolute.yml`, which still applies when the feature is on. So an ops file can change the stemcell, or pin another squid release, and its pin wins over the kit's.
 
 ### Ops files
 
 Any other feature name loads `ops/<feature>.yml` from the deployment repo, after the kit's own files. The kit refuses a feature name that matches neither a kit feature nor an ops file.
+
+## The squid release
+
+The kit pins squid release 2.0.0 with its GitHub url and sha1, so BOSH downloads the release during the deploy, and the director needs to reach GitHub. The release builds Squid 7.7 from source on the first deploy, which takes a few minutes, and it starts Squid with `setpriv` from util-linux. Squid 7 needs a C++17 compiler, which the noble and resolute stemcells have.
+
+This build of Squid leaves out OpenSSL, GnuTLS, Kerberos, LDAP, and SASL. A forward proxy tunnels HTTPS with CONNECT, so it needs no TLS library of its own, but an `acl` that uses an authentication helper for LDAP, Kerberos, or SASL, or any TLS option, won't work.
+
+## Upgrading from version 1.x
+
+Version 2.0.0 of the kit moves the default stemcell from `ubuntu-xenial` to `ubuntu-noble`, and it replaces squid 1.1.0, which built Squid 4.10, with squid 2.0.0, which builds Squid 7.7. Every deployment of version 1.x runs on xenial, which the kit no longer supports, so each one changes in these ways when you deploy it with the new kit:
+
+- BOSH recreates the proxy's VM on the noble stemcell, because the stemcell changes. The proxy keeps its static address, so its clients need no change, and nothing from squid 1.1.0 is left running on the new VM.
+
+- The proxy is down while BOSH recreates the VM, because the kit deploys one instance. Every deployment that sends its traffic through the proxy loses that path until the new VM is running, so pick a quiet window, and don't run deploys that need the proxy in the meantime.
+
+- An `acl` property that uses an authentication helper for LDAP, Kerberos, or SASL, or any TLS option, no longer works, because this build of Squid leaves those libraries out. An `acl` that uses a directive Squid has since removed won't parse either. The default ACL works unchanged.
+
+- Squid now denies requests to loopback, link-local, and the VM's own address before your ACL, so a client that relied on the proxy to reach one of those addresses loses that access.
+
+Before you upgrade, upload a noble stemcell to the director, or pin `stemcell_version` to one that it has. If the environment sets `params.stemcell_os` to `ubuntu-xenial`, remove that parameter, because the kit now refuses it. If an ops file pins squid 1.x, remove that pin, because the deploy-time checks refuse it.
 
 ## Deploy-time checks
 
@@ -76,13 +92,13 @@ The blueprint gate reads only params, so an ops file can still change the stemce
 
 - The `resolute` feature is on, but some stemcell is on another os. The check reads a stemcell's `os`, or its `name` when it has no `os`, such as `bosh-aws-xen-hvm-ubuntu-resolute-go_agent`, and it counts the FIPS stemcells as their series.
 
-- A resolute stemcell is paired with a squid release older than 2.0.0, which would fail to start without `chpst`. The check runs with the feature off too. It looks only at the stemcells of the instance groups that run a squid job, and a release candidate such as `2.0.0-rc.1` counts as the version it leads to.
+- The squid release is older than 2.0.0, on any stemcell. Those releases start Squid with `chpst`, which the resolute stemcell doesn't ship, and they don't deny requests to loopback, link-local, or the VM's own address. A release candidate such as `2.0.0-rc.1` counts as the version it leads to.
 
-- A trusty, xenial, or bionic stemcell is paired with squid 2.0.0 or later, which would fail to compile Squid 7.
+- An instance group that runs a squid job is on a trusty, xenial, bionic, or jammy stemcell. Squid 7 doesn't compile on the first three, and the kit no longer supports jammy. The check looks only at the stemcells of the instance groups that run a squid job, so an ops file can add another instance group on another stemcell.
 
 - An ops file adds bpm older than 1.4.41 next to a resolute stemcell, because older bpm releases don't compile there. A release candidate of 1.4.41 counts as older. The kit doesn't deploy bpm itself.
 
-- The squid or bpm release has no version, or is pinned to `latest`, on a stemcell that the checks care about. Each of the two cases has its own message.
+- The squid release has no version, is pinned to `latest`, or has a version that the check doesn't understand. A bpm release on a resolute stemcell has no version or is pinned to `latest`. Each case has its own message.
 
 The hook resolves `((name))` and `((name.key))` placeholders from the BOSH variables file before it checks, and it refuses a placeholder that no variable resolves. When every check passes, it prints one line that names the releases and the stemcells it checked.
 
@@ -234,9 +250,9 @@ http_access allow localnet
 
 The release adds `http_access deny all` after your ACL. The default lets clients on the RFC 1918 private networks, the IPv6 unique local range `fc00::/7`, and the IPv6 link-local range `fe80::/10` use the proxy. It allows CONNECT only to port 443, and it refuses plain requests to a port that isn't in `Safe_ports`, which lists a few well-known ports and every port from 1025 to 65535.
 
-Squid 2.0.0, which the `resolute` feature deploys, also denies requests to loopback and link-local destinations before your ACL. No client can reach the proxy's own loopback services or the cloud metadata service at 169.254.169.254 through it, whatever your ACL allows. Squid 1.1.0 has no such rule.
+The squid release also denies requests to loopback and link-local destinations, and to the VM's own address, before your ACL. No client can reach the proxy's own services or the cloud metadata service at 169.254.169.254 through it, whatever your ACL allows.
 
-Squid 7 in squid 2.0.0 already defines the `CONNECT` ACL, and it accepts the `acl CONNECT method CONNECT` line as a harmless repeat, so the same ACL works on both releases. Squid 6 removed Gopher, so the port 70 entry no longer matters on squid 2.0.0, but it does no harm.
+Squid 7 already defines the `CONNECT` ACL, and it accepts the `acl CONNECT method CONNECT` line as a harmless repeat, so the default ACL from version 1.x of the kit works unchanged. Squid 6 removed Gopher, so the port 70 entry no longer matters, but it does no harm.
 
 ### Restricting the source networks
 
@@ -290,11 +306,11 @@ When the proxy denies a request, check that the ACL covers the client's address 
 genesis my-env bosh logs squid/0 --follow
 ```
 
-On squid 2.0.0, Squid writes its cache log to `/var/vcap/sys/log/squid/cache.log`, so startup errors, such as a port that won't bind, and runtime errors show up there. The output of the start and stop script goes to `/var/vcap/sys/log/squid/squid.log`. Squid 1.1.0 sends its cache log to `/dev/null`, so on xenial only the errors that Squid prints before it starts in the background reach `squid.log`.
+Squid writes its cache log to `/var/vcap/sys/log/squid/cache.log`, so startup errors, such as a port that won't bind, and runtime errors show up there. The output of the start and stop script goes to `/var/vcap/sys/log/squid/squid.log`.
 
 ## History
 
-- The next release adds the `resolute` feature, PVE support, and the deploy-time checks. It also rewrites the hooks from Bash as Perl modules for Genesis 3.1.0, with the curl addon in a module of its own.
+- Version 2.0.0 moves the default to the `ubuntu-noble` stemcell with squid release 2.0.0, and it drops xenial and squid 1.1.0. It adds the `resolute` feature, PVE support, and the deploy-time checks, and it rewrites the hooks from Bash as Perl modules for Genesis 3.1.0, with the curl addon in a module of its own.
 
 - Version 1.2.0 moved to squid release 1.1.0 and Genesis 2.7.0.
 

@@ -50,12 +50,12 @@ instance_groups:
 name: ocfp-forcpi-mgmt-squid
 releases:
 - name: squid
-  sha1: 61848d550902a159efdc6f3e2d24291d53d65b76
-  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
-  version: 1.1.0
+  sha1: 6013e6be18500378c2f0aab7170a25853d287dc5
+  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v2.0.0/squid-2.0.0.tgz
+  version: 2.0.0
 stemcells:
 - alias: default
-  os: ubuntu-xenial
+  os: ubuntu-noble
   version: latest
 update:
   canaries: 1

@@ -16,16 +16,20 @@ use Genesis qw/bail info run load_json new_enough semver/;
 my $RESOLUTE_MIN_BPM = '1.4.41';
 
 # squid releases older than this start Squid with chpst, which the resolute
-# stemcell does not ship.  From this version on, squid builds Squid 7, which
-# needs a C++17 compiler, so it no longer compiles on the older stemcells.
-my $SQUID_SETPRIV = '2.0.0';
+# stemcell does not ship, and they lack the rules that deny loopback,
+# link-local, and the VM's own address.  The kit deploys this version on every
+# stemcell it supports.
+my $SQUID_MIN = '2.0.0';
 
 # A stemcell's os names its Ubuntu series, and a FIPS stemcell adds -fips to
 # it.  A stemcell listed by name carries the os inside the name, as in
 # bosh-openstack-kvm-ubuntu-resolute-go_agent.  Both forms are matched as a
-# whole series, so ubuntu-resolute never matches some longer os name.
+# whole series, so ubuntu-resolute never matches some longer os name.  The
+# kit supports ubuntu-noble and later, so the older series are refused.
+# squid 2.0.0 builds Squid 7, which does not compile on trusty, xenial, or
+# bionic, and the kit no longer supports jammy.
 my $RESOLUTE_OS   = qr/ubuntu-resolute(?:-fips)?/;
-my $OLD_OS        = qr/ubuntu-(?:trusty|xenial|bionic)(?:-fips)?/;
+my $OLD_OS        = qr/ubuntu-(?:trusty|xenial|bionic|jammy)(?:-fips)?/;
 
 # init - Initialize the hook {{{
 sub init {
@@ -59,7 +63,7 @@ sub _load_yaml {
 	my ($out, $rc, $err) = run({stderr => 0, redact_output => 1}, 'spruce json < "$1"', $file);
 	my $data = $rc == 0 ? eval {load_json($out)} : undef;
 	bail(
-		"Cannot read %s at #C{%s} to check its stemcells and bpm release: %s",
+		"Cannot read %s at #C{%s} to check its stemcells and releases: %s",
 		$what, $file, ($err // '') =~ s/\s+$//r || ($rc ? "spruce exited $rc" : 'not a YAML map')
 	) unless ref($data) eq 'HASH';
 	return $data;
@@ -80,7 +84,7 @@ sub _value {
 		my $var = $self->_var($name);
 		bail(
 			"The manifest sets %s to #R{((%s))}, which no BOSH variable in the ".
-			"environment resolves, so the resolute checks cannot tell what it ".
+			"environment resolves, so the deploy checks cannot tell what it ".
 			"deploys.  Set it in the environment file instead.", $what, $name
 		) unless defined($var) && !ref($var);
 		$var;
@@ -127,7 +131,7 @@ sub _check_resolute_manifest {
 	my $file = $ENV{GENESIS_MANIFEST_FILE};
 	bail(
 		"Genesis did not pass the manifest to the pre-deploy hook, so its ".
-		"stemcells and bpm release cannot be checked."
+		"stemcells and releases cannot be checked."
 	) unless defined($file) && -f $file && -r $file;
 	my $manifest = $self->_load_yaml($file, 'the manifest');
 
@@ -187,22 +191,25 @@ sub _check_resolute_manifest {
 # }}}
 
 # _check_squid_release - the squid release must start on the stemcell {{{
-# squid releases before 2.0.0 start Squid with chpst, so they fail on a
-# resolute stemcell.  squid 2.0.0 and later build Squid 7, which does not
-# compile on trusty, xenial, or bionic.  The check reads the merged manifest,
-# so it also catches an ops file that overrides the squid release or the
-# stemcells.  It looks only at the stemcells of the instance groups that run
-# a job from the squid release, so an ops file can add an instance group on
-# another stemcell without tripping it.  A release candidate counts as the
-# version it leads up to, so 2.0.0-rc.1 is part of the 2.x line.
+# squid releases before 2.0.0 start Squid with chpst and lack its deny rules,
+# so they are refused on any stemcell.  The stemcells that run squid must be
+# ubuntu-noble or later, because squid 2.0.0 builds Squid 7, which does not
+# compile on trusty, xenial, or bionic, and the kit no longer supports jammy.
+# The check reads the merged manifest, so it also catches an ops file that
+# overrides the squid release or the stemcells.  It looks only at the
+# stemcells of the instance groups that run a job from the squid release, so
+# an ops file can add an instance group on another stemcell without tripping
+# it.  A release candidate counts as the version it leads up to, so
+# 2.0.0-rc.1 is part of the 2.x line.
 sub _check_squid_release {
 	my ($self) = @_;
-	my @stemcells = $self->_squid_stemcells;
-	return 1 unless @stemcells;
-
-	my @resolute = grep {_is_series($_, $RESOLUTE_OS)} @stemcells;
-	my @old      = grep {_is_series($_, $OLD_OS)} @stemcells;
-	return 1 unless @resolute || @old;
+	my @old = grep {_is_series($_, $OLD_OS)} $self->_squid_stemcells;
+	bail(
+		"The manifest deploys squid on the stemcell %s, but the kit supports ".
+		"ubuntu-noble and later only, and squid %s does not compile on trusty, ".
+		"xenial, or bionic.  Remove the override that sets the stemcell.",
+		join(', ', map {"#R{" . ($_->{os} // $_->{name} // $_->{alias}) . "}"} @old), $SQUID_MIN
+	) if @old;
 
 	for my $release ($self->_list($self->{manifest}, 'releases')) {
 		next unless ($self->_value($release->{name}, 'a release name') // '') eq 'squid';
@@ -221,20 +228,13 @@ sub _check_squid_release {
 			"The manifest deploys the squid release at #R{%s}, which is not a version ".
 			"the stemcell check understands.", $version
 		) unless @semver;
-		my $setpriv = new_enough(join('.', @semver[0..2]), $SQUID_SETPRIV);
 		bail(
-			"The manifest deploys squid #R{%s} on a resolute stemcell.  Releases ".
-			"before squid %s start Squid with chpst, which the resolute stemcell ".
-			"does not ship.  Enable the #c{resolute} feature, or remove the override ".
-			"that sets the squid release.", $version, $SQUID_SETPRIV
-		) if @resolute && !$setpriv;
-		bail(
-			"The manifest deploys squid #R{%s} on the stemcell %s.  squid %s and ".
-			"later build Squid 7, which needs a C++17 compiler that this stemcell ".
-			"does not have.  Use the #c{resolute} feature, or keep the kit's default ".
-			"squid release on this stemcell.",
-			$version, join(', ', map {$_->{os} // $_->{name} // $_->{alias}} @old), $SQUID_SETPRIV
-		) if @old && $setpriv;
+			"The manifest deploys squid #R{%s}, but the kit needs squid %s or later.  ".
+			"Older releases start Squid with chpst, which the resolute stemcell does ".
+			"not ship, and they do not deny requests to loopback, link-local, or the ".
+			"VM's own address.  Remove the override that sets the squid release.",
+			$version, $SQUID_MIN
+		) unless new_enough(join('.', @semver[0..2]), $SQUID_MIN);
 		push @{$self->{checked_releases}}, "squid $version";
 	}
 	return 1;

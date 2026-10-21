@@ -15,7 +15,7 @@ params:
   vm_type: test-vm-type
   availability_zones:
     - z2
-  stemcell_os: ubuntu-jammy
+  stemcell_os: ubuntu-noble-fips
   stemcell_version: 9.9.9
   acl: |
     acl localnet src 10.99.0.0/16

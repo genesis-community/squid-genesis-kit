@@ -37,11 +37,12 @@ sub perform {
 	) if @invalid;
 
 	$self->_check_port;
+	$self->_check_stemcell_os;
 
 	# The kit's own fragments go first, and the deployment repo's ops files
 	# follow in the order the features list them.  An ops file therefore wins
-	# over every kit fragment, including the squid release that the resolute
-	# feature pins.
+	# over every kit fragment, including the stemcell os that the resolute
+	# feature sets and the squid release that the base manifest pins.
 	if ($self->want_feature('ocfp')) {
 		$self->add_files('manifests/ocfp.yml');
 		$self->_process_ocfp;
@@ -70,6 +71,25 @@ sub _check_port {
 		"port from 1024 to 65535.  Squid runs as vcap without any capabilities, ".
 		"so it cannot bind a lower port.", ref($port) ? 'a structure' : $port
 	) unless !ref($port) && $port =~ /^[0-9]+$/ && $port >= 1024 && $port <= 65535;
+	return;
+}
+# }}}
+
+# _check_stemcell_os - The kit supports ubuntu-noble and later {{{
+# squid 2.0.0 builds Squid 7, which needs a C++17 compiler, so it does not
+# compile on trusty, xenial, or bionic.  The kit no longer supports jammy
+# either, so every series before noble is refused here, before anything is
+# deployed.  A FIPS stemcell counts as its series.  The pre-deploy hook makes
+# the same check on the merged manifest, which an ops file can still change.
+sub _check_stemcell_os {
+	my ($self) = @_;
+	my $os = $self->env->lookup('params.stemcell_os', 'ubuntu-noble');
+	bail(
+		"The environment sets #c{params.stemcell_os} to #R{%s}, but the kit ".
+		"supports ubuntu-noble and later only.  Remove that parameter, so the ".
+		"proxy deploys on ubuntu-noble, or on ubuntu-resolute when the ".
+		"#c{resolute} feature is on.", $os
+	) if !ref($os) && $os =~ /^ubuntu-(?:trusty|xenial|bionic|jammy)(?:-fips)?$/;
 	return;
 }
 # }}}
@@ -170,10 +190,11 @@ sub _bosh_az {
 # }}}
 
 # _process_resolute - Opt-in ubuntu-resolute stemcell support {{{
-# Adds the kit's resolute fragments after the base and OCFP ones, so that
-# they override the stemcell os default (ubuntu-xenial) and the squid
-# release pin.  The deployment repo's ops files, ops/resolute.yml included,
-# load after them, so they can still change either.
+# Adds the kit's resolute fragment after the base and OCFP ones, so that it
+# overrides the stemcell os default (ubuntu-noble).  Both stemcells run the
+# same squid release, so the feature changes only the stemcell.  The
+# deployment repo's ops files, ops/resolute.yml included, load after it, so
+# they can still change the stemcell or the release.
 sub _process_resolute {
 	my ($self) = @_;
 
@@ -184,12 +205,8 @@ sub _process_resolute {
 			"the environment sets #c{params.stemcell_os} to #R{%s}.  " .
 			"Remove that parameter.", $stemcell_os
 		) if $stemcell_os ne 'ubuntu-resolute';
-		$self->add_files(
-			'manifests/resolute.yml',
-			# squid 1.1.0 starts Squid with chpst, which resolute does not ship.
-			'manifests/releases/squid-resolute.yml',
-		);
-	} elsif ($self->env->lookup('params.stemcell_os', 'ubuntu-xenial') eq 'ubuntu-resolute') {
+		$self->add_files('manifests/resolute.yml');
+	} elsif ($self->env->lookup('params.stemcell_os', 'ubuntu-noble') eq 'ubuntu-resolute') {
 		bail(
 			"The environment sets #c{params.stemcell_os} to ubuntu-resolute " .
 			"without the #c{resolute} feature.  Enable the feature and remove " .

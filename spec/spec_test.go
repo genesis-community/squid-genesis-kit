@@ -28,6 +28,16 @@ var _ = Describe("Squid Kit", func() {
 			CPI:         "aws",
 		})
 		Test(Environment{
+			Name:        "xenial-stemcell",
+			CloudConfig: "aws",
+			CPI:         "aws",
+			OutputMatchers: OutputMatchers{
+				GenesisAddSecrets: MatchRegexp(`ubuntu-noble\s+and\s+later\s+only`),
+				GenesisCheck:      MatchRegexp(`ubuntu-noble\s+and\s+later\s+only`),
+				GenesisManifest:   MatchRegexp(`ubuntu-noble\s+and\s+later\s+only`),
+			},
+		})
+		Test(Environment{
 			Name:        "low-port",
 			CloudConfig: "aws",
 			CPI:         "aws",

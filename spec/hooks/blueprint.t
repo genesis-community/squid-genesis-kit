@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
-# Proves the blueprint's port check and its OCFP AZ resolution.  The AZ has
-# to come out the way the cloud-config hook names the subnet's AZ, which is
-# through Genesis's lookup_az, or BOSH rejects the deploy.
+# Proves the blueprint's port check, its stemcell os check, and its OCFP AZ
+# resolution.  The AZ has to come out the way the cloud-config hook names the
+# subnet's AZ, which is through Genesis's lookup_az, or BOSH rejects the
+# deploy.
 #
 # Each case hands the hook a stand-in environment that answers only what the
 # code under test asks.  Run it with `prove spec/hooks` or
@@ -48,6 +49,18 @@ for my $port ('80', '1023', '0', '65536', '31 28', 'http') {
 	like($@, qr/1024 to\s+65535/, "the refusal for '$port' names the range");
 }
 ok(!eval { hook(params => {'params.port' => [3128]})->_check_port; 1 }, 'a list for the port is refused');
+
+# The stemcell os check
+ok(eval { hook()->_check_stemcell_os; 1 }, 'the default stemcell os passes') or diag($@);
+for my $os (qw/ubuntu-noble ubuntu-noble-fips ubuntu-resolute some-custom-os/) {
+	my $ok = eval { hook(params => {'params.stemcell_os' => $os})->_check_stemcell_os; 1 };
+	ok($ok, "stemcell os $os passes") or diag($@);
+}
+for my $os (qw/ubuntu-trusty ubuntu-xenial ubuntu-xenial-fips ubuntu-bionic ubuntu-jammy ubuntu-jammy-fips/) {
+	my $ok = eval { hook(params => {'params.stemcell_os' => $os})->_check_stemcell_os; 1 };
+	ok(!$ok, "stemcell os $os is refused");
+	like($@, qr/ubuntu-noble and later only/, "the refusal for $os names the supported series");
+}
 
 # The OCFP AZ
 my $azs = {
