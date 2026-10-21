@@ -50,7 +50,9 @@ instance_groups:
 name: resolute-squid
 releases:
 - name: squid
-  version: 2.0.0+dev.2
+  sha1: 6013e6be18500378c2f0aab7170a25853d287dc5
+  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v2.0.0/squid-2.0.0.tgz
+  version: 2.0.0
 stemcells:
 - alias: default
   os: ubuntu-resolute

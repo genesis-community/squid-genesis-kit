@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-- We added an opt-in `resolute` feature that deploys the proxy on the `ubuntu-resolute` stemcell. It swaps the squid release from 1.1.0 to 2.0.0, because squid 1.1.0 starts Squid with `chpst`, which the resolute stemcell no longer ships. squid 2.0.0 builds Squid 7.7 and starts it with `setpriv` instead. The feature pins the dev release `2.0.0+dev.2` for now, which you upload to the director by hand, and that pin changes to the final release when it's cut. Moving an environment from xenial to the feature recreates the proxy's VM, because the stemcell changes.
+- We added an opt-in `resolute` feature that deploys the proxy on the `ubuntu-resolute` stemcell. It swaps the squid release from 1.1.0 to 2.0.0, because squid 1.1.0 starts Squid with `chpst`, which the resolute stemcell no longer ships. squid 2.0.0 builds Squid 7.7 and starts it with `setpriv` instead. The feature pins the final release with its url and sha1, so BOSH downloads it during the deploy. Moving an environment from xenial to the feature recreates the proxy's VM, because the stemcell changes.
 
-- The squid `2.0.0+dev.2` release runs Squid with only the `vcap` group, denies requests to loopback and link-local destinations, writes Squid's cache log to `/var/vcap/sys/log/squid/cache.log`, and kills leftover Squid processes when the job starts or stops. Its README lists every change since 1.1.0.
+- The squid 2.0.0 release runs Squid with only the `vcap` group, denies requests to loopback, link-local, and the VM's own address, writes Squid's cache log to `/var/vcap/sys/log/squid/cache.log`, and kills leftover Squid processes when the job starts or stops. Its README lists every change since 1.1.0.
 
 - The default stays on the `ubuntu-xenial` stemcell with squid 1.1.0, because Squid 7 needs a C++17 compiler that xenial doesn't have.
 

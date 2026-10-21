@@ -1,21 +1,10 @@
 ---
 # squid for ubuntu-resolute.  Loaded by the resolute feature, because squid
 # 1.1.0 starts Squid with chpst, which the resolute stemcell does not ship.
-# squid 2.0.0 builds Squid 7 and starts it with setpriv instead.  It merges
+# squid 2.0.0 builds Squid 7.7 and starts it with setpriv instead.  It merges
 # over manifests/releases/squid.yml by release name.
-#
-# squid 2.0.0+dev.2 is a dev release, built from squid-boshrelease branch
-# resolute (Squid 7.7) and not published anywhere yet, so it carries no url
-# or sha1, and the url and sha1 of squid 1.1.0 are pruned.  Upload it to the
-# director before deploying:
-#
-#   genesis <env> bosh upload-release squid-2.0.0+dev.2.tgz
-#
-# When the final release is cut, replace this version with the final version
-# and set its url and sha1 here in place of the prunes, so that Genesis
-# uploads it by itself.
 releases:
 - name:    squid
-  version: 2.0.0+dev.2
-  url:     (( prune ))
-  sha1:    (( prune ))
+  version: 2.0.0
+  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v2.0.0/squid-2.0.0.tgz
+  sha1:    6013e6be18500378c2f0aab7170a25853d287dc5

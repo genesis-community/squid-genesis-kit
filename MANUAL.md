@@ -60,15 +60,11 @@ We need the new release because squid 1.1.0 starts Squid with `chpst`, which com
 
 The kit refuses an environment that turns the feature on while setting `params.stemcell_os` to another os. It also refuses one that sets `params.stemcell_os` to `ubuntu-resolute` without the feature, and the message tells you to enable the feature and remove the parameter.
 
-For now, the feature pins squid `2.0.0+dev.2`, a dev release that isn't published anywhere yet. Upload it to the director yourself before you deploy:
-
-```
-genesis my-env bosh upload-release squid-2.0.0+dev.2.tgz
-```
+The feature pins squid 2.0.0 with its GitHub url and sha1, so BOSH downloads the release during the deploy.
 
 Moving an existing environment from xenial to the resolute feature changes the stemcell, so BOSH recreates the proxy's VM, and nothing from squid 1.1.0 is left running on it.
 
-The deployment repo's ops files load after all of the kit's own files, in the order that the features list them. That includes `ops/resolute.yml`, which still applies when the feature is on. So an ops file can change the stemcell, or pin another squid release, such as the final 2.0.0, and its pin wins over the dev release that the feature pins.
+The deployment repo's ops files load after all of the kit's own files, in the order that the features list them. That includes `ops/resolute.yml`, which still applies when the feature is on. So an ops file can change the stemcell, or pin another squid release, and its pin wins over the one that the feature sets.
 
 ### Ops files
 
