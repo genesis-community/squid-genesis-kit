@@ -8,7 +8,7 @@ BEGIN {push @INC, $ENV{GENESIS_LIB} ? $ENV{GENESIS_LIB} : $ENV{HOME}.'/.genesis/
 
 use parent qw(Genesis::Hook);
 
-use Genesis qw/bail run load_json new_enough semver/;
+use Genesis qw/bail info run load_json new_enough semver/;
 
 # bpm releases older than this do not compile on the resolute stemcell.  The
 # kit does not deploy bpm itself, but an ops file from the deployment repo can
@@ -19,7 +19,13 @@ my $RESOLUTE_MIN_BPM = '1.4.41';
 # stemcell does not ship.  From this version on, squid builds Squid 7, which
 # needs a C++17 compiler, so it no longer compiles on the older stemcells.
 my $SQUID_SETPRIV = '2.0.0';
-my $OLD_STEMCELLS = qr/ubuntu-(?:trusty|xenial|bionic)/;
+
+# A stemcell's os names its Ubuntu series, and a FIPS stemcell adds -fips to
+# it.  A stemcell listed by name carries the os inside the name, as in
+# bosh-openstack-kvm-ubuntu-resolute-go_agent.  Both forms are matched as a
+# whole series, so ubuntu-resolute never matches some longer os name.
+my $RESOLUTE_OS   = qr/ubuntu-resolute(?:-fips)?/;
+my $OLD_OS        = qr/ubuntu-(?:trusty|xenial|bionic)(?:-fips)?/;
 
 # init - Initialize the hook {{{
 sub init {
@@ -35,6 +41,11 @@ sub perform {
 	my ($self) = @_;
 	$self->_check_resolute_manifest;
 	$self->_check_squid_release;
+	info(
+		"Pre-deploy checks passed for %s on %s.",
+		join(', ', @{$self->{checked_releases} // []}) || 'the manifest',
+		join(', ', map {_stemcell_label($_)} @{$self->{stemcells} // []}) || 'no stemcells'
+	);
 	return $self->done(1);
 }
 # }}}
@@ -58,21 +69,36 @@ sub _load_yaml {
 # _value - resolve ((name)) placeholders from the BOSH variables file {{{
 # BOSH fills ((name)) placeholders at deploy time from the variables file that
 # Genesis passes along, so they are resolved the same way before checking.  A
-# placeholder that no variable resolves bails, because the check cannot tell
-# what it deploys.
+# dotted name such as ((a.b)) walks into the variables file the way BOSH does.
+# A placeholder that no variable resolves bails, because the check cannot
+# tell what it deploys.
 sub _value {
 	my ($self, $value, $what) = @_;
 	return $value unless defined($value) && !ref($value) && $value =~ /\(\(/;
 	(my $resolved = $value) =~ s{\(\(\s*([^()\s]+)\s*\)\)}{
 		my $name = $1;
+		my $var = $self->_var($name);
 		bail(
 			"The manifest sets %s to #R{((%s))}, which no BOSH variable in the ".
 			"environment resolves, so the resolute checks cannot tell what it ".
 			"deploys.  Set it in the environment file instead.", $what, $name
-		) unless defined($self->{vars}{$name}) && !ref($self->{vars}{$name});
-		$self->{vars}{$name};
+		) unless defined($var) && !ref($var);
+		$var;
 	}ge;
 	return $resolved;
+}
+
+# _var - look up a BOSH variable by name, walking a dotted name
+sub _var {
+	my ($self, $name) = @_;
+	my $vars = $self->{vars} // {};
+	return $vars->{$name} if exists($vars->{$name});
+	my $value = $vars;
+	for my $part (split /\./, $name, -1) {
+		return undef unless ref($value) eq 'HASH' && exists($value->{$part});
+		$value = $value->{$part};
+	}
+	return $value;
 }
 # }}}
 
@@ -115,11 +141,7 @@ sub _check_resolute_manifest {
 		os    => $self->_value($_->{os},    'a stemcell os'),
 		name  => $self->_value($_->{name},  'a stemcell name'),
 	}} $self->_list($manifest, 'stemcells');
-	my $is_resolute = sub {
-		my ($s) = @_;
-		return defined($s->{os}) ? $s->{os} eq 'ubuntu-resolute'
-		                         : ($s->{name} // '') =~ /ubuntu-resolute/;
-	};
+	my $is_resolute = sub {_is_series($_[0], $RESOLUTE_OS)};
 	$self->{manifest}  = $manifest;
 	$self->{stemcells} = \@stemcells;
 
@@ -158,6 +180,7 @@ sub _check_resolute_manifest {
 			"bpm %s or newer.  Remove the override that sets the bpm release.",
 			$version, $RESOLUTE_MIN_BPM
 		) unless semver($version) && new_enough($version, $RESOLUTE_MIN_BPM);
+		push @{$self->{checked_releases}}, "bpm $version";
 	}
 	return 1;
 }
@@ -168,18 +191,17 @@ sub _check_resolute_manifest {
 # resolute stemcell.  squid 2.0.0 and later build Squid 7, which does not
 # compile on trusty, xenial, or bionic.  The check reads the merged manifest,
 # so it also catches an ops file that overrides the squid release or the
-# stemcells.
+# stemcells.  It looks only at the stemcells of the instance groups that run
+# a job from the squid release, so an ops file can add an instance group on
+# another stemcell without tripping it.  A release candidate counts as the
+# version it leads up to, so 2.0.0-rc.1 is part of the 2.x line.
 sub _check_squid_release {
 	my ($self) = @_;
-	my @stemcells = @{$self->{stemcells} // []};
+	my @stemcells = $self->_squid_stemcells;
 	return 1 unless @stemcells;
 
-	my @resolute = grep {
-		defined($_->{os}) ? $_->{os} eq 'ubuntu-resolute' : ($_->{name} // '') =~ /ubuntu-resolute/
-	} @stemcells;
-	my @old = grep {
-		defined($_->{os}) ? $_->{os} =~ /^$OLD_STEMCELLS$/ : ($_->{name} // '') =~ $OLD_STEMCELLS
-	} @stemcells;
+	my @resolute = grep {_is_series($_, $RESOLUTE_OS)} @stemcells;
+	my @old      = grep {_is_series($_, $OLD_OS)} @stemcells;
 	return 1 unless @resolute || @old;
 
 	for my $release ($self->_list($self->{manifest}, 'releases')) {
@@ -188,12 +210,18 @@ sub _check_squid_release {
 		bail(
 			"The manifest deploys the squid release without a version.  Pin it, so ".
 			"the deploy cannot pick an upload that does not start on the stemcell."
-		) unless defined($version) && $version ne '' && $version ne 'latest';
+		) unless defined($version) && $version ne '';
+		bail(
+			"The manifest deploys the squid release #R{latest}.  Pin it to a ".
+			"version, so the deploy cannot pick an upload that does not start on ".
+			"the stemcell."
+		) if $version eq 'latest';
+		my @semver = semver($version);
 		bail(
 			"The manifest deploys the squid release at #R{%s}, which is not a version ".
 			"the stemcell check understands.", $version
-		) unless semver($version);
-		my $setpriv = new_enough($version, $SQUID_SETPRIV);
+		) unless @semver;
+		my $setpriv = new_enough(join('.', @semver[0..2]), $SQUID_SETPRIV);
 		bail(
 			"The manifest deploys squid #R{%s} on a resolute stemcell.  Releases ".
 			"before squid %s start Squid with chpst, which the resolute stemcell ".
@@ -207,8 +235,48 @@ sub _check_squid_release {
 			"squid release on this stemcell.",
 			$version, join(', ', map {$_->{os} // $_->{name} // $_->{alias}} @old), $SQUID_SETPRIV
 		) if @old && $setpriv;
+		push @{$self->{checked_releases}}, "squid $version";
 	}
 	return 1;
+}
+# }}}
+
+# _squid_stemcells - the stemcells that the squid release runs on {{{
+# The stemcells of every instance group with a job from the squid release.
+# When no instance group names a stemcell that the manifest lists, every
+# stemcell counts, so a manifest the check cannot map is still checked.
+sub _squid_stemcells {
+	my ($self) = @_;
+	my @stemcells = @{$self->{stemcells} // []};
+	my %by_alias = map {$_->{alias} => $_} @stemcells;
+	my %used;
+	for my $group ($self->_list($self->{manifest}, 'instance_groups')) {
+		my $jobs = ref($group->{jobs}) eq 'ARRAY' ? $group->{jobs} : [];
+		next unless grep {
+			ref($_) eq 'HASH' && ($self->_value($_->{release}, 'a job release') // '') eq 'squid'
+		} @$jobs;
+		my $alias = $self->_value($group->{stemcell}, 'an instance group stemcell');
+		$used{$alias} = 1 if defined($alias) && $by_alias{$alias};
+	}
+	return @stemcells unless %used;
+	return grep {$used{$_->{alias}}} @stemcells;
+}
+# }}}
+
+# _is_series - whether a stemcell is on an Ubuntu series {{{
+# The os must be the series exactly.  A stemcell with no os is matched by its
+# name, which must end in the series, optionally followed by -go_agent.
+sub _is_series {
+	my ($stemcell, $series) = @_;
+	return $stemcell->{os} =~ /^$series$/ if defined($stemcell->{os});
+	return ($stemcell->{name} // '') =~ /(?:^|-)$series(?:-go_agent)?$/;
+}
+# }}}
+
+# _stemcell_label - how the success line names a stemcell {{{
+sub _stemcell_label {
+	my ($stemcell) = @_;
+	return $stemcell->{os} // $stemcell->{name} // $stemcell->{alias};
 }
 # }}}
 
