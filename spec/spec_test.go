@@ -27,6 +27,16 @@ var _ = Describe("Squid Kit", func() {
 			CloudConfig: "aws",
 			CPI:         "aws",
 		})
+		Test(Environment{
+			Name:        "low-port",
+			CloudConfig: "aws",
+			CPI:         "aws",
+			OutputMatchers: OutputMatchers{
+				GenesisAddSecrets: MatchRegexp(`1024\s+to\s+65535`),
+				GenesisCheck:      MatchRegexp(`1024\s+to\s+65535`),
+				GenesisManifest:   MatchRegexp(`1024\s+to\s+65535`),
+			},
+		})
 	})
 
 	Describe("pve", func() {
@@ -43,6 +53,41 @@ var _ = Describe("Squid Kit", func() {
 			CloudConfig: "aws-ocfp",
 			CPI:         "aws",
 		})
+		Test(Environment{
+			Name:        "ocfp-forcpi-mgmt",
+			CloudConfig: "aws-ocfp",
+			CPI:         "aws",
+		})
+		Test(Environment{
+			Name:        "ocfp-noip-mgmt",
+			CloudConfig: "aws-ocfp",
+			CPI:         "aws",
+			OutputMatchers: OutputMatchers{
+				GenesisAddSecrets: MatchRegexp(`so\s+the\s+proxy\s+has\s+no\s+address`),
+				GenesisCheck:      MatchRegexp(`so\s+the\s+proxy\s+has\s+no\s+address`),
+				GenesisManifest:   MatchRegexp(`so\s+the\s+proxy\s+has\s+no\s+address`),
+			},
+		})
+		Test(Environment{
+			Name:        "ocfp-noaz-mgmt",
+			CloudConfig: "aws-ocfp",
+			CPI:         "aws",
+			OutputMatchers: OutputMatchers{
+				GenesisAddSecrets: MatchRegexp(`names\s+no\s+AZ`),
+				GenesisCheck:      MatchRegexp(`names\s+no\s+AZ`),
+				GenesisManifest:   MatchRegexp(`names\s+no\s+AZ`),
+			},
+		})
+		Test(Environment{
+			Name:        "ocfp-badaz-mgmt",
+			CloudConfig: "aws-ocfp",
+			CPI:         "aws",
+			OutputMatchers: OutputMatchers{
+				GenesisAddSecrets: MatchRegexp(`the\s+proxy\s+has\s+no\s+BOSH\s+AZ`),
+				GenesisCheck:      MatchRegexp(`the\s+proxy\s+has\s+no\s+BOSH\s+AZ`),
+				GenesisManifest:   MatchRegexp(`the\s+proxy\s+has\s+no\s+BOSH\s+AZ`),
+			},
+		})
 	})
 
 	Describe("resolute", func() {
@@ -55,6 +100,12 @@ var _ = Describe("Squid Kit", func() {
 			Name:        "ocfp-resolute-mgmt",
 			CloudConfig: "aws-ocfp",
 			CPI:         "aws",
+		})
+		Test(Environment{
+			Name:        "resolute-ops-squid-pin",
+			CloudConfig: "aws",
+			CPI:         "aws",
+			Ops:         []string{"squid-final"},
 		})
 		Test(Environment{
 			Name:        "resolute-wrong-stemcell-os",

@@ -1,0 +1,14 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features:
+  - resolute
+  - squid-final
+
+genesis:
+  env:    resolute-ops-squid-pin
+  entomb: false
+
+params:
+  stemcell_version: "0.184"

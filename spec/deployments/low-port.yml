@@ -1,0 +1,12 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features: []
+
+genesis:
+  env:    low-port
+  entomb: false
+
+params:
+  port: 80

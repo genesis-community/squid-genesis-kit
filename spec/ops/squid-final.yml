@@ -1,0 +1,8 @@
+---
+# Stands in for a deployment repo's ops file that pins a final squid
+# release by its own feature name, which must win over the resolute pin.
+releases:
+- name:    squid
+  version: 2.0.0
+  url:     https://example.com/squid-2.0.0.tgz
+  sha1:    0123456789abcdef0123456789abcdef01234567
