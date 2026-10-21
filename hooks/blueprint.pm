@@ -100,8 +100,7 @@ sub _process_ocfp {
 		"The OCFP subnet that reserves squid_ip %s names no AZ.", $ip
 	) unless $az;
 
-	my $az_map  = $self->env->director_exodus_lookup('/network')->{azs} // {};
-	my $az_name = $az_map->{$az}{name};
+	my $az_name = $self->_bosh_az($az);
 	bail(
 		"The OCFP AZ #c{%s} for squid_ip %s is not in the director's network ".
 		"exodus data, so the proxy has no BOSH AZ.", $az, $ip
@@ -131,6 +130,42 @@ EOF
 	mkfile_or_fail($self->env->kit->path($file), 0644, $fragment);
 	$self->add_files($file);
 	return;
+}
+# }}}
+
+# _bosh_az - The BOSH AZ name for an OCFP AZ {{{
+# The cloud-config hook names each subnet's AZ through Genesis's lookup_az,
+# so the instance group has to use the same name, or BOSH rejects the deploy.
+# This follows the same rules.  The OCFP AZ can be a key of the director's
+# network exodus AZs, an AZ's rendered name, its name for this environment's
+# CPI, or the zN short form of a rendered name.  The result is the AZ's name
+# for this environment's CPI when the CPI is enabled and the director records
+# one, and its rendered name otherwise.
+sub _bosh_az {
+	my ($self, $az) = @_;
+	my $azs = $self->env->director_exodus_lookup('/network')->{azs} // {};
+	return unless ref($azs) eq 'HASH' && keys %$azs;
+
+	my $cpi = $self->env->cpi_enabled ? $self->env->cpi_name : undef;
+	my $for_cpi = sub {
+		my ($key) = @_;
+		return unless defined($cpi);
+		my $names = $azs->{$key}{for_cpi};
+		return ref($names) eq 'HASH' ? $names->{$cpi} : undef;
+	};
+
+	my ($key) = grep {$_ eq $az} keys %$azs;
+	($key) = grep {($azs->{$_}{name} // '') eq $az} sort keys %$azs unless defined($key);
+	($key) = grep {($for_cpi->($_) // '') eq $az} sort keys %$azs unless defined($key);
+	if (!defined($key) && $az =~ /^z([0-9]+)$/) {
+		my $index = $1;
+		($key) = grep {
+			my $i = $azs->{$_}{index} // (($azs->{$_}{name} // '') =~ /([0-9]+)$/)[0];
+			defined($i) && $i eq $index
+		} sort keys %$azs;
+	}
+	return unless defined($key) && ref($azs->{$key}) eq 'HASH';
+	return $for_cpi->($key) // $azs->{$key}{name};
 }
 # }}}
 
