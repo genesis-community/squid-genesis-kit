@@ -27,30 +27,52 @@ sub perform {
 		manifests/releases/squid.yml
 	));
 
-	my @invalid = ();
-	for my $feature ($self->features) {
-		if ($feature eq 'ocfp') {
-			$self->add_files('manifests/ocfp.yml');
-		} elsif ($feature eq 'resolute') {
-			# Handled after the loop so that it overrides every other fragment.
-		} elsif (-f "$ENV{GENESIS_ROOT}/ops/${feature}.yml") {
-			$self->add_files("$ENV{GENESIS_ROOT}/ops/${feature}.yml");
-		} else {
-			push @invalid, $feature;
-		}
-	}
-
+	my @invalid = grep {
+		$_ ne 'ocfp' && $_ ne 'resolute' && ! -f "$ENV{GENESIS_ROOT}/ops/$_.yml"
+	} $self->features;
 	bail(
 		"Invalid %s encountered: %s",
 		count_nouns(scalar(@invalid), 'feature', suppress_count => 1),
 		join(', ', @invalid)
 	) if @invalid;
 
-	$self->_process_ocfp if $self->want_feature('ocfp');
+	$self->_check_port;
+
+	# The kit's own fragments go first, and the deployment repo's ops files
+	# follow in the order the features list them.  An ops file therefore wins
+	# over every kit fragment, including the squid release that the resolute
+	# feature pins.
+	if ($self->want_feature('ocfp')) {
+		$self->add_files('manifests/ocfp.yml');
+		$self->_process_ocfp;
+	}
 	$self->_process_resolute;
+
+	for my $feature ($self->features) {
+		next if $feature eq 'ocfp';
+		my $ops = "$ENV{GENESIS_ROOT}/ops/${feature}.yml";
+		$self->add_files($ops) if -f $ops;
+	}
 
 	return $self->done(1);
 }
+
+# _check_port - Squid runs as vcap, so it cannot bind a privileged port {{{
+# The squid job starts Squid as vcap without any capabilities, so a port
+# below 1024 would fail to bind, and the kid would exit at every start.  The
+# release refuses such a port when it renders its template, but the kit says
+# so first, before anything is deployed.
+sub _check_port {
+	my ($self) = @_;
+	my $port = $self->env->lookup('params.port', '3128');
+	bail(
+		"The environment sets #c{params.port} to #R{%s}, but the proxy needs a ".
+		"port from 1024 to 65535.  Squid runs as vcap without any capabilities, ".
+		"so it cannot bind a lower port.", ref($port) ? 'a structure' : $port
+	) unless !ref($port) && $port =~ /^[0-9]+$/ && $port >= 1024 && $port <= 65535;
+	return;
+}
+# }}}
 
 # _process_ocfp - Pin the proxy to its reserved OCFP address {{{
 # The proxy is one instance, and its address is the one other deployments
@@ -113,10 +135,10 @@ EOF
 # }}}
 
 # _process_resolute - Opt-in ubuntu-resolute stemcell support {{{
-# Called after every other fragment is added so that it overrides the
-# stemcell os default (ubuntu-xenial) and the squid release pin.  A
-# deployment repo's ops/resolute.yml is added last, so it can still adjust
-# either.
+# Adds the kit's resolute fragments after the base and OCFP ones, so that
+# they override the stemcell os default (ubuntu-xenial) and the squid
+# release pin.  The deployment repo's ops files, ops/resolute.yml included,
+# load after them, so they can still change either.
 sub _process_resolute {
 	my ($self) = @_;
 
@@ -132,7 +154,6 @@ sub _process_resolute {
 			# squid 1.1.0 starts Squid with chpst, which resolute does not ship.
 			'manifests/releases/squid-resolute.yml',
 		);
-		$self->add_files("$ENV{GENESIS_ROOT}/ops/resolute.yml") if -f "$ENV{GENESIS_ROOT}/ops/resolute.yml";
 	} elsif ($self->env->lookup('params.stemcell_os', 'ubuntu-xenial') eq 'ubuntu-resolute') {
 		bail(
 			"The environment sets #c{params.stemcell_os} to ubuntu-resolute " .
