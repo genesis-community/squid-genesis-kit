@@ -55,7 +55,7 @@ genesis my-env info
 To check that the proxy works, send a request through it with the `curl` addon:
 
 ```
-genesis my-env do curl -- -sI https://www.google.com
+genesis my-env do curl -sI https://www.google.com
 ```
 
 Finally, point your BOSH and Cloud Foundry deployments at the proxy by adding these parameters to their environment files, and redeploy them:
