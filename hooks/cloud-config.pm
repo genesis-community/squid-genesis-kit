@@ -11,7 +11,7 @@ use parent qw(Genesis::Hook::CloudConfig);
 
 use Genesis::Hook::CloudConfig::Helpers qw/gigabytes megabytes/;
 
-use Genesis qw/bail/;
+use Genesis qw/bail warning/;
 
 sub init {
   my $class = shift;
@@ -123,18 +123,36 @@ sub perform {
 }
 
 # _pve_cpi_setting - resolve a PVE CPI setting from the env file, then the OCFP vault config, then a default {{{
+# A default can be wrong for the host: vmbr0 is often the host's own LAN and
+# not the network the deployments live on.  So falling back to one warns,
+# naming both places that could set it, and a setting with no default bails.
 sub _pve_cpi_setting {
   my ($self, $env_key, $vault_key, $default) = @_;
   my $value = scalar($self->env->lookup("bosh-configs.cpi.$env_key", undef));
-  $value //= scalar($self->env->ocfp_config_lookup("cpi.pve.$vault_key", undef));
-  $value //= $default;
+  $value //= scalar($self->env->ocfp_config_lookup("cpi.pve.$vault_key", undef))
+    if $self->env->is_ocfp;
+  return $value if defined($value) && length($value);
+
+  # The cloud properties are built for every IaaS and only this one's are
+  # used, so a missing PVE setting matters only on PVE.
+  return $default unless ($self->iaas // '') eq 'pve';
+
   bail(
     "No PVE %s configured for %s: set #c{bosh-configs.cpi.%s} in the ".
     "environment file, or run #g{ocfp vault populate} so the OCFP config ".
     "provides #c{cpi/pve:%s}.",
     $vault_key, $self->env->name, $env_key, $vault_key
-  ) unless defined($value) && length($value);
-  return $value;
+  ) unless defined($default) && length($default);
+
+  unless ($self->{__pve_default_warned}{$env_key}++) {
+    warning(
+      "No PVE %s is configured for %s, so the cloud config uses #y{%s}.  Set ".
+      "#c{bosh-configs.cpi.%s} in the environment file, or #c{cpi/pve:%s} in the ".
+      "OCFP config, if that is not the right one for this host.",
+      $vault_key, $self->env->name, $default, $env_key, $vault_key
+    );
+  }
+  return $default;
 }
 # }}}
 
