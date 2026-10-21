@@ -1,38 +1,46 @@
-# vim: set ts=2 sw=2 sts=2 noet fdm=marker foldlevel=1:
-package Genesis::Hook::Info::Squid;
+package Genesis::Hook::Info::Squid v1.0.0;
 
 use v5.20;
-use warnings; # Genesis supports min perl v5.20.
+use warnings;
 
 # Only needed for development
 BEGIN {push @INC, $ENV{GENESIS_LIB} ? $ENV{GENESIS_LIB} : $ENV{HOME}.'/.genesis/lib'}
 
-# Parent class inheritance
-use parent qw(Genesis::Hook::Info);
+use parent qw(Genesis::Hook);
 
-# Import required functions
 use Genesis qw/info/;
 
+# init - Initialize the hook {{{
 sub init {
-  my ($class, %ops) = @_;
-  my $obj = $class->SUPER::init(%ops);
-  $obj->check_minimum_genesis_version('3.1.0-rc.20');
-  return $obj;
+	my ($class, %ops) = @_;
+	my $obj = $class->SUPER::init(%ops);
+	$obj->check_minimum_genesis_version('3.1.0');
+	return $obj;
 }
+# }}}
 
+# perform - Main hook execution {{{
 sub perform {
-  my ($self) = @_;
+	my ($self) = @_;
 
-  # Get proxy information from exodus data
-  my $proxy = $self->env->exodus_lookup('http_proxy');
+	my $proxy = $self->env->exodus_lookup('http_proxy', '');
+	unless ($proxy) {
+		info("#Y{No proxy address in the exodus data.}  Deploy the environment first.");
+		return $self->done(1);
+	}
 
-  info(
-    "\nRnvironment variables:\n\n".
-    "\texport http_proxy=$proxy\n".
-    "\texport https_proxy=$proxy\n"
-  );
+	info("");
+	info("Squid proxy: #C{%s}", $proxy);
+	info("");
+	info("Environment variables:");
+	info("");
+	info("  export http_proxy=%s", $proxy);
+	info("  export https_proxy=%s", $proxy);
+	info("");
 
-  return $self->done();
+	return $self->done(1);
 }
+# }}}
 
 1;
+# vim: set ts=2 sw=2 sts=2 noet fdm=marker foldlevel=1:

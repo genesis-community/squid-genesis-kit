@@ -1,0 +1,16 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features:
+  - ocfp
+  - resolute
+
+genesis:
+  env:      ocfp-resolute-mgmt
+  bosh_env: proto-main
+  entomb:   false
+
+params:
+  ocfp_subnet_prefix: ocfp
+  stemcell_version: "0.184"

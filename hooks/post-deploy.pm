@@ -1,39 +1,41 @@
-# vim: set ts=2 sw=2 sts=2 noet fdm=marker foldlevel=1:
-package Genesis::Hook::PostDeploy::Squid;
+package Genesis::Hook::PostDeploy::Squid v1.0.0;
 
 use v5.20;
-use warnings; # Genesis min perl version is 5.20
-use Genesis qw/info/;
+use warnings;
+
 # Only needed for development
-BEGIN {push @INC, $ENV{GENESIS_LIB} ? $ENV{GENESIS_LIB} : $ENV{HOME}.'./.genesis/lib'}
+BEGIN {push @INC, $ENV{GENESIS_LIB} ? $ENV{GENESIS_LIB} : $ENV{HOME}.'/.genesis/lib'}
 
 use parent qw(Genesis::Hook::PostDeploy);
+
+use Genesis qw/info/;
+
+# init - Initialize the hook {{{
 sub init {
-  my ($class, %ops) = @_;
-  my $self = $class->SUPER::init(%ops);
-  $self->check_minimum_genesis_version('3.1.0-rc.20');
-  return $self;
+	my ($class, %ops) = @_;
+	my $obj = $class->SUPER::init(%ops);
+	$obj->check_minimum_genesis_version('3.1.0');
+	return $obj;
 }
+# }}}
 
+# perform - Main hook execution {{{
 sub perform {
-  my ($self) = @_;
+	my ($self) = @_;
+	return $self->done(1) unless $self->deploy_successful;
 
-  # Base class has deploy_successful method to check if GENESIS_DEPLOY_RC == 0
-  if ($self->deploy_successful) {
-    info(
-      "\n#M{$ENV{GENESIS_ENVIRONMENT}} Squid Proxy deployed!\n".
-      "\nFor details about the deployment, run\n".
-      "\t#G{$ENV{GENESIS_CALL_ENV} info}\n".
-      "\nTo test the proxy, run\n".
-      "\t#G{$ENV{GENESIS_CALL_ENV} do -- curl https://www.google.com}\n".
-    );
-  }
+	info("");
+	info("#M{$ENV{GENESIS_ENVIRONMENT}} Squid proxy deployed!");
+	info("");
+	info("For details about the deployment, run");
+	info("  #G{$ENV{GENESIS_CALL_ENV} info}");
+	info("");
+	info("To test the proxy, run");
+	info("  #G{$ENV{GENESIS_CALL_ENV} do curl -- -sI https://www.google.com}");
 
-  # Call parent class methods if needed
-  $self->SUPER::perform() if $self->can('SUPER::perform');
-
-  # Mark the hook as completed successfully
-  return $self->done();
+	return $self->done(1);
 }
+# }}}
 
 1;
+# vim: set ts=2 sw=2 sts=2 noet fdm=marker foldlevel=1:

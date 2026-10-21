@@ -1,0 +1,14 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features:
+  - ocfp
+
+genesis:
+  env:      ocfp-mgmt
+  bosh_env: proto-main
+  entomb:   false
+
+params:
+  ocfp_subnet_prefix: ocfp

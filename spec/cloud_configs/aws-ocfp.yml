@@ -1,0 +1,50 @@
+azs:
+- name: z1
+  cloud_properties:
+    availability_zone: us-east-1a
+- name: z2
+  cloud_properties:
+    availability_zone: us-east-1b
+- name: z3
+  cloud_properties:
+    availability_zone: us-east-1c
+
+vm_types:
+- name: ocfp-mgmt.squid.vm-squid
+  cloud_properties:
+    instance_type: t3.micro
+    ephemeral_disk: {size: 4_096}
+- name: default
+  cloud_properties:
+    instance_type: m5.large
+    ephemeral_disk: {size: 25_000}
+
+networks:
+- name: ocfp-mgmt.squid.net-squid
+  type: manual
+  subnets:
+  - range:    10.0.2.0/24
+    gateway:  10.0.2.1
+    azs:      [z1]
+    dns:      [8.8.8.8]
+    reserved: [10.0.2.1 - 10.0.2.185]
+    static:   [10.0.2.186 - 10.0.2.198]
+    cloud_properties:
+      subnet: subnet-aaa
+  - range:    10.0.3.0/24
+    gateway:  10.0.3.1
+    azs:      [z2]
+    dns:      [8.8.8.8]
+    reserved: [10.0.3.1 - 10.0.3.185]
+    static:   [10.0.3.186 - 10.0.3.198]
+    cloud_properties:
+      subnet: subnet-bbb
+- name: vip
+  type: vip
+
+compilation:
+  workers: 5
+  reuse_compilation_vms: true
+  az: z1
+  vm_type: default
+  network: ocfp-mgmt.squid.net-squid

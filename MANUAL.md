@@ -1,83 +1,94 @@
 # Squid Proxy Genesis Kit Manual
 
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Deployment Parameters](#deployment-parameters)
-   - [Network Parameters](#network-parameters)
-   - [VM Parameters](#vm-parameters)
-   - [Squid Configuration Parameters](#squid-configuration-parameters)
-3. [Cloud Configuration](#cloud-configuration)
-4. [Available Addons](#available-addons)
-5. [Deployment Scenarios](#deployment-scenarios)
-   - [Basic Deployment](#basic-deployment)
-   - [AWS Deployment](#aws-deployment)
-   - [GCP Deployment](#gcp-deployment)
-   - [vSphere Deployment](#vsphere-deployment)
-6. [Integration with Other Systems](#integration-with-other-systems)
-   - [BOSH Director Integration](#bosh-director-integration)
-   - [Cloud Foundry Integration](#cloud-foundry-integration)
-7. [ACL Configuration](#acl-configuration)
-   - [Default ACLs](#default-acls)
-   - [Custom ACL Examples](#custom-acl-examples)
-8. [Advanced Configuration](#advanced-configuration)
-9. [Troubleshooting](#troubleshooting)
-10. [History](#history)
-
 ## Overview
 
-The **Squid Proxy Genesis Kit** deploys a Squid HTTP/HTTPS proxy
-which you (and your deployments) can use for accessing HTTP
-resources on other networks, like the public Internet, without
-having direct access.
+The Squid Proxy Genesis Kit deploys a single Squid HTTP and HTTPS proxy. Your deployments can use it to reach HTTP resources on other networks, such as the public Internet, when they have no direct access of their own. It's most useful in compliance-driven environments, where direct Internet access is limited or forbidden and the proxy becomes the one controlled egress point.
 
-This kit deploys a single instance of Squid proxy that can serve as an egress point for HTTP and HTTPS traffic in restricted network environments. The proxy is particularly useful in compliance-driven environments where direct internet access is limited or prohibited.
+The kit needs Genesis 3.1.0 or later.
 
-## Deployment Parameters
+## Parameters
 
-### Network Parameters
+### Network parameters
 
-- `port` - The port that Squid will listen on. Defaults to `3128`.
+- `port`
 
-- `network` - What network to deploy Squid into. This network
-  must be defined in your cloud config. Defaults to `squid`.
+  The port that Squid listens on. It defaults to `3128`.
 
-- `availability_zones` - What BOSH HA availability zones to deploy
-  the proxy across. The chosen network must have at least one
-  subnet in each of the listed zones, and the zones themselves
-  must be defined in your cloud config. Defaults to `z1`.
+- `network`
 
-  **Note**: This Genesis Kit only deploys a single-instance Squid
-  proxy, so availability zone configuration will not bring high
-  availability to the deployment.
+  The network that Squid is deployed into, which must exist in your cloud config. It defaults to `squid`, and the `ocfp` feature sets it for you.
 
-### VM Parameters
+- `availability_zones`
 
-- `vm_type` - What type of VM to deploy. This type must
-  exist in your cloud config. Defaults to `default`.
+  The BOSH availability zones for the proxy. The network needs a subnet in each zone, and the zones must exist in your cloud config. It defaults to `z1`. The kit deploys one instance, so listing more zones does not make the proxy highly available.
 
-- `stemcell_os` - The operating system stemcell you want to
-  deploy on. (default: `ubuntu-xenial`)
+### VM parameters
 
-- `stemcell_version` - The specific version of the stemcell you
-  want to deploy on. (default: `latest`)
+- `vm_type`
 
-### Squid Configuration Parameters
+  The VM type to deploy, which must exist in your cloud config. It defaults to `default`, and the `ocfp` feature sets it for you.
 
-- `acl` - The Squid Proxy Access Control List (ACL) which will
-  govern who can use the proxy, and what they are allowed to
-  connect to, via what protocols.
+- `stemcell_os`
 
-  The default ACL allows private networks to connect out to most
-  common HTTP/HTTPS ports. See the section [Default ACLs](#default-acls),
-  later, for more details.
+  The stemcell operating system. It defaults to `ubuntu-xenial`. To deploy on `ubuntu-resolute`, turn on the `resolute` feature instead of setting this parameter, because the feature also changes the squid release.
 
-## Cloud Configuration
+- `stemcell_version`
 
-By default, Squid uses the following VM types/networks from your
-cloud config. Feel free to override them in your environment, if
-you would rather they use entities already existing in your cloud
-config:
+  The stemcell version. It defaults to `latest`.
+
+### Squid parameters
+
+- `acl`
+
+  The Squid access control list, which governs who can use the proxy, what they can connect to, and over which protocols. The default lets private networks connect out to the common HTTP and HTTPS ports, and the [ACL configuration](#acl-configuration) section shows it in full.
+
+## Features
+
+### ocfp
+
+The `ocfp` feature deploys the proxy into the OCFP reference architecture. It names the network and VM type `<env>.squid.net-squid` and `<env>.squid.vm-squid`, and the cloud-config hook builds both from the OCFP config.
+
+Other deployments are told the proxy's address, so the address has to stay put. The feature takes it from a `squid_ip` reserved address on the first OCFP subnet that has one, and it places the proxy in that subnet's AZ. Reserve the address in the OCFP config and run `ocfp vault populate` before you deploy. The kit refuses to build the manifest when no subnet reserves a `squid_ip`.
+
+### resolute
+
+The `resolute` feature deploys the proxy on the `ubuntu-resolute` stemcell. It sets `params.stemcell_os` to `ubuntu-resolute`, and it swaps the squid release from 1.1.0 to 2.0.0.
+
+We need the new release because squid 1.1.0 starts Squid with `chpst`, which comes with runit, and the resolute stemcell no longer ships runit. squid 2.0.0 builds Squid 7.7 and starts it with `setpriv` from util-linux instead. Squid 7 needs a C++17 compiler, which the default xenial stemcell doesn't have, so xenial deployments stay on squid 1.1.0.
+
+The kit refuses an environment that turns the feature on while setting `params.stemcell_os` to another os. It also refuses one that sets `params.stemcell_os` to `ubuntu-resolute` without the feature, and the message tells you to enable the feature and remove the parameter.
+
+For now, the feature pins squid `2.0.0+dev.1`, a dev release that isn't published anywhere yet. Upload it to the director yourself before you deploy:
+
+```
+genesis my-env bosh upload-release squid-2.0.0+dev.1.tgz
+```
+
+A deployment repo's `ops/resolute.yml` still applies when the feature is on. It loads after the kit's resolute files, so it can adjust the stemcell or the squid release.
+
+### Ops files
+
+Any other feature name loads `ops/<feature>.yml` from the deployment repo. The kit refuses a feature name that matches neither a kit feature nor an ops file.
+
+## Deploy-time checks
+
+The blueprint gate reads only params, so an ops file can still change the stemcells or the releases after the gate passes. The pre-deploy hook checks the merged manifest as the last word, and it refuses the deploy in these cases:
+
+- The `resolute` feature is on, but some stemcell is on another os.
+
+- A resolute stemcell is paired with a squid release older than 2.0.0, which would fail to start without `chpst`. The check runs with the feature off too.
+
+- A trusty, xenial, or bionic stemcell is paired with squid 2.0.0 or later, which would fail to compile Squid 7.
+
+- An ops file adds bpm older than 1.4.41 next to a resolute stemcell, because older bpm releases don't compile there. The kit doesn't deploy bpm itself.
+
+- The squid or bpm release has no version, or is pinned to `latest`, on a stemcell that the checks care about.
+
+The hook resolves `((name))` placeholders from the BOSH variables file before it checks, and it refuses a placeholder that no variable resolves.
+
+## Cloud config
+
+Outside OCFP, the proxy uses the network and VM type named in your params, which default to these:
 
 ```yaml
 params:
@@ -85,7 +96,7 @@ params:
   vm_type: default
 ```
 
-The cloud configuration also needs to define the appropriate network(s) that will be used by the Squid proxy. For example:
+The network needs one static address for the proxy, for example:
 
 ```yaml
 networks:
@@ -99,129 +110,98 @@ networks:
       name: MY-NETWORK
 ```
 
-## Available Addons
+Under OCFP, the cloud-config hook generates the network, the VM type, and a disk type for AWS, OpenStack, and PVE. On PVE, it reads these settings from the environment file first, then from the OCFP config, and falls back to a default when neither sets one:
 
-Genesis kit addons are small add-on scripts that can be run via
-`genesis do`.
+| Environment file setting | OCFP config key | Default |
+|-----|-----|-----|
+| `bosh-configs.cpi.pve_network_bridge` | `cpi/pve:network_bridge` | `vmbr0` |
+| `bosh-configs.cpi.pve_disk_storage` | `cpi/pve:disk_storage` | `local-lvm` |
+| `bosh-configs.cpi.pve_disk_format` | none | `raw` |
+| `bosh-configs.cpi.pve_squid_cpu` | none | 2 |
+| `bosh-configs.cpi.pve_squid_ram` | none | 2048 MB, or 4096 MB at prod scale |
+| `bosh-configs.cpi.pve_squid_disk` | none | 16384 MB |
 
-- `curl` - Test HTTP/HTTPS access, through the deployed proxy,
-  to an arbitrary endpoint, using the `curl` utility. You have to
-  install curl, of course, but this lets you run arbitrarily
-  complicated HTTP requests through the proxy.
+## Addons
 
-  Example:
+Genesis addons are small commands that you run with `genesis do`.
+
+- `curl`
+
+  Sends a request through the deployed proxy with your local `curl`, so you can test that the proxy reaches an endpoint. Everything after `--` goes to curl unchanged, and the addon fails when curl does. You need curl installed.
+
   ```
-  genesis do my-env -- curl https://www.google.com
+  genesis my-env do curl -- -sI https://www.google.com
   ```
 
-## Deployment Scenarios
+## Example environments
 
-### Basic Deployment
-
-A basic deployment requires minimal configuration. The following environment file will deploy a Squid proxy with all default settings:
+A minimal environment file deploys the proxy with every default:
 
 ```yaml
 ---
 kit:
   name:    squid
-  version: 1.2.0
+  version: latest
+  features: []
 
-params:
-  env: basic-deployment
+genesis:
+  env: my-env
+
+params: {}
 ```
 
-### AWS Deployment
-
-For AWS deployments, you'll want to ensure the proxy is in a subnet with internet access (like a public subnet):
+An OCFP environment on the resolute stemcell looks like this:
 
 ```yaml
 ---
 kit:
   name:    squid
-  version: 1.2.0
+  version: latest
+  features:
+  - ocfp
+  - resolute
+
+genesis:
+  env:      ocfp-mgmt
+  bosh_env: ocfp-mgmt
 
 params:
-  env: aws-deployment
-  
-  # Use AWS-specific network and VM type from your cloud config
-  network: public
-  vm_type: t3.small
+  stemcell_version: "0.184"
 ```
 
-Ensure your AWS security groups allow:
-- Outbound traffic on ports 80 and 443 (to the internet)
-- Inbound traffic on port 3128 (from your internal networks)
+On AWS, put the proxy in a subnet that has Internet access. Your security groups should allow outbound traffic on ports 80 and 443, and inbound traffic on port 3128 from your internal networks.
 
-### GCP Deployment
+## Integration with other systems
 
-For GCP deployments:
+### BOSH directors
 
-```yaml
----
-kit:
-  name:    squid
-  version: 1.2.0
-
-params:
-  env: gcp-deployment
-  
-  # Use GCP-specific network and VM type from your cloud config
-  network: proxy-network
-  vm_type: n1-standard-1
-```
-
-### vSphere Deployment
-
-For vSphere deployments:
-
-```yaml
----
-kit:
-  name:    squid
-  version: 1.2.0
-
-params:
-  env: vsphere-deployment
-  
-  # Use vSphere-specific network and VM type from your cloud config
-  network: dmz
-  vm_type: small
-```
-
-## Integration with Other Systems
-
-### BOSH Director Integration
-
-To configure a BOSH director to use your Squid proxy, add the following to your BOSH Genesis Kit deployment environment file:
+To send a BOSH director through the proxy, add the proxy settings to the director's environment file:
 
 ```yaml
 params:
-  http_proxy: http://SQUID-IP:3128
+  http_proxy:  http://SQUID-IP:3128
   https_proxy: http://SQUID-IP:3128
-  no_proxy: 127.0.0.1,localhost,BOSH-DIRECTOR-IP
+  no_proxy:    127.0.0.1,localhost,BOSH-DIRECTOR-IP
 ```
 
-Replace `SQUID-IP` with your Squid proxy's IP address and `BOSH-DIRECTOR-IP` with the IP address of your BOSH director.
+Replace `SQUID-IP` with the proxy's address, which `genesis my-env info` prints, and `BOSH-DIRECTOR-IP` with the director's address.
 
-### Cloud Foundry Integration
+### Cloud Foundry
 
-For Cloud Foundry deployments to use your Squid proxy, add the following to your CF Genesis Kit deployment environment file:
+Cloud Foundry takes the same settings, and its `no_proxy` list should also name the deployment's internal addresses:
 
 ```yaml
 params:
-  http_proxy: http://SQUID-IP:3128
+  http_proxy:  http://SQUID-IP:3128
   https_proxy: http://SQUID-IP:3128
-  no_proxy: 127.0.0.1,localhost,BOSH-DIRECTOR-IP,CF-INTERNAL-IPS
+  no_proxy:    127.0.0.1,localhost,BOSH-DIRECTOR-IP,CF-INTERNAL-IPS
 ```
 
-Replace `SQUID-IP` with your Squid proxy's IP address, `BOSH-DIRECTOR-IP` with the IP address of your BOSH director, and `CF-INTERNAL-IPS` with a comma-separated list of your CF deployment's internal IP addresses.
+## ACL configuration
 
-## ACL Configuration
+### The default ACL
 
-### Default ACLs
-
-Here is the default Squid access control list (ACL) that you get
-if you don't override it with the `acl` property:
+You get this access control list unless you set the `acl` parameter:
 
 ```
 acl localnet src 10.0.0.0/8     # RFC 1918 possible internal network
@@ -246,38 +226,34 @@ acl CONNECT method CONNECT
 http_access deny !Safe_ports
 http_access deny CONNECT !SSL_ports
 http_access allow localnet
-http_access deny all
 ```
 
-This ACL allows RFC-1918 private networks (10/8, 172.16/12, and
-192.168/16) to use the proxy, only allows SSL/TLS on 443, and
-tries to limit ports to a sane list.
+The release adds `http_access deny all` after your ACL. The default lets the RFC 1918 private networks use the proxy, allows CONNECT only to port 443, and limits plain requests to a short list of ports.
 
-### Custom ACL Examples
+Squid 7 in squid 2.0.0 already defines the `CONNECT` ACL, and it accepts the `acl CONNECT method CONNECT` line as a harmless repeat, so the same ACL works on both releases. Squid 6 removed Gopher, so the port 70 entry no longer matters on squid 2.0.0, but it does no harm.
 
-#### Restrict Access to Specific Network Ranges
+### Restricting the source networks
 
-If you want to limit proxy access to only certain network ranges:
+To let only one subnet use the proxy, list just that subnet:
 
 ```yaml
 params:
   acl: |
-    acl restricted_net src 10.10.10.0/24  # Only allow this specific subnet
-    
+    acl restricted_net src 10.10.10.0/24
+
     acl SSL_ports  port 443
-    acl Safe_ports port 80          # http
-    acl Safe_ports port 443         # https
+    acl Safe_ports port 80
+    acl Safe_ports port 443
     acl CONNECT method CONNECT
-    
+
     http_access deny !Safe_ports
     http_access deny CONNECT !SSL_ports
     http_access allow restricted_net
-    http_access deny all
 ```
 
-#### Allow Access to Only Specific Domains
+### Restricting the destination domains
 
-To restrict outbound access to specific domains only:
+To allow only a few destination domains, add a `dstdomain` ACL and require it:
 
 ```yaml
 params:
@@ -285,73 +261,37 @@ params:
     acl localnet src 10.0.0.0/8
     acl localnet src 172.16.0.0/12
     acl localnet src 192.168.0.0/16
-    
-    acl SSL_ports port 443
+
+    acl SSL_ports  port 443
     acl Safe_ports port 80
     acl Safe_ports port 443
-    
-    # Define allowed domains
+    acl CONNECT method CONNECT
+
     acl allowed_domains dstdomain .github.com .rubygems.org .ubuntu.com
-    
+
     http_access deny !Safe_ports
     http_access deny CONNECT !SSL_ports
-    # Only allow access to defined domains
     http_access allow localnet allowed_domains
-    http_access deny all
 ```
-
-Note: This requires additional Squid configuration and may need custom Squid packages depending on your requirements.
-
-## Advanced Configuration
-
-For advanced Squid configurations, you may need to customize beyond what the Genesis Kit provides by default. This can be done by deploying a custom BOSH release or by providing a fully customized ACL configuration.
-
-### Monitoring and Metrics
-
-While not built into the Genesis Kit directly, you can monitor your Squid proxy using standard BOSH VM monitoring tools. Key metrics to watch include:
-
-- CPU and memory usage
-- Disk space usage (for caching)
-- Network throughput
-- Number of concurrent connections
-
-### Performance Tuning
-
-For high-traffic environments, consider the following:
-
-1. Increase the VM size (modify `vm_type` parameter)
-2. Optimize the Squid cache settings (requires custom ACL)
-3. Consider deploying multiple proxies behind a load balancer for true high availability
 
 ## Troubleshooting
 
-### Common Issues
+When clients cannot connect to the proxy, check the network path and the security groups or firewall rules first, and then confirm that the proxy is running with `genesis my-env bosh instances`.
 
-1. **Cannot Connect to Proxy**:
-   - Verify network connectivity 
-   - Check security groups/firewall rules
-   - Verify the proxy is running (`bosh -d squid instances`)
-
-2. **Access Denied Errors**:
-   - Check ACL configuration
-   - Verify client IP is within allowed ranges
-   - Check Squid logs for denied requests
-
-3. **Slow Performance**:
-   - Check VM resource utilization
-   - Verify network bandwidth isn't saturated
-   - Consider tuning Squid cache settings
-
-### Viewing Logs
-
-To view the Squid proxy logs:
+When the proxy denies a request, check that the ACL covers the client's address and the destination port. The access log records every decision, and you can follow it with:
 
 ```
-genesis my-env logs squid/0 -f
+genesis my-env bosh logs squid/0 --follow
 ```
+
+The release sends Squid's cache log to `/dev/null`, so startup and configuration errors show up in `/var/vcap/sys/log/squid/squid.log` instead, which holds the output of the start and stop script.
 
 ## History
 
-- Version 1.2.0 - Refactored hooks to perl modules, extracted addon functionality.
-- Version 1.0.0 - Initial stable release.
-- Version 0.3.0 - First version to support Genesis 2.6 hooks for addon scripts and `genesis info`.
+- The next release adds the `resolute` feature, PVE support, and the deploy-time checks, and moves the hooks to Genesis 3.1.0.
+
+- Version 1.2.0 refactored the hooks into Perl modules and extracted the addon.
+
+- Version 1.0.0 was the first stable release.
+
+- Version 0.3.0 was the first version to support Genesis 2.6 hooks for addons and `genesis info`.

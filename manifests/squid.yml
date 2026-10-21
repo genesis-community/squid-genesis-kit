@@ -57,12 +57,6 @@ update:
   max_in_flight: 1
   update_watch_time: 30000-120000
 
-releases:
-- name: squid
-  version: 1.1.0
-  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
-  sha1:    61848d550902a159efdc6f3e2d24291d53d65b76
-
 stemcells:
 - alias:   default
   os:      (( grab params.stemcell_os      || "ubuntu-xenial" ))

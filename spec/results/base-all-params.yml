@@ -1,0 +1,45 @@
+exodus:
+  bosh: some-other-env
+  features: ""
+  http_proxy: http://10.99.0.16:8080
+  https_proxy: http://10.99.0.16:8080
+  iaas: null
+  is_director: false
+  scale: null
+  services: null
+  use_create_env: false
+instance_groups:
+- azs:
+  - z2
+  instances: 1
+  jobs:
+  - name: squid
+    properties:
+      acl: |
+        acl localnet src 10.99.0.0/16
+        http_access allow localnet
+      port: "8080"
+    release: squid
+  name: squid
+  networks:
+  - name: test-network
+    static_ips:
+    - 10.99.0.16
+  stemcell: default
+  vm_type: test-vm-type
+name: base-all-params-squid
+releases:
+- name: squid
+  sha1: 61848d550902a159efdc6f3e2d24291d53d65b76
+  url: https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
+  version: 1.1.0
+stemcells:
+- alias: default
+  os: ubuntu-jammy
+  version: 9.9.9
+update:
+  canaries: 1
+  canary_watch_time: 30000-120000
+  max_in_flight: 1
+  serial: true
+  update_watch_time: 30000-120000

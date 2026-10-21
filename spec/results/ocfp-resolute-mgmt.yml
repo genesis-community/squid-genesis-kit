@@ -1,0 +1,63 @@
+exodus:
+  bosh: proto-main
+  features: ocfp,resolute
+  http_proxy: http://10.0.2.190:3128
+  https_proxy: http://10.0.2.190:3128
+  iaas: aws
+  is_director: false
+  scale: null
+  services: null
+  use_create_env: false
+instance_groups:
+- azs:
+  - z1
+  instances: 1
+  jobs:
+  - name: squid
+    properties:
+      acl: |
+        acl localnet src 10.0.0.0/8     # RFC 1918 possible internal network
+        acl localnet src 172.16.0.0/12  # RFC 1918 possible internal network
+        acl localnet src 192.168.0.0/16 # RFC 1918 possible internal network
+        acl localnet src fc00::/7       # RFC 4193 local private network range
+        acl localnet src fe80::/10      # RFC 4291 link-local (directly plugged) machines
+
+        acl SSL_ports  port 443
+        acl Safe_ports port 80          # http
+        acl Safe_ports port 21          # ftp
+        acl Safe_ports port 443         # https
+        acl Safe_ports port 70          # gopher
+        acl Safe_ports port 210         # wais
+        acl Safe_ports port 1025-65535  # unregistered ports
+        acl Safe_ports port 280         # http-mgmt
+        acl Safe_ports port 488         # gss-http
+        acl Safe_ports port 591         # filemaker
+        acl Safe_ports port 777         # multiling http
+        acl CONNECT method CONNECT
+
+        http_access deny !Safe_ports
+        http_access deny CONNECT !SSL_ports
+        http_access allow localnet
+      port: "3128"
+    release: squid
+  name: squid
+  networks:
+  - name: ocfp-resolute-mgmt.squid.net-squid
+    static_ips:
+    - 10.0.2.190
+  stemcell: default
+  vm_type: ocfp-resolute-mgmt.squid.vm-squid
+name: ocfp-resolute-mgmt-squid
+releases:
+- name: squid
+  version: 2.0.0+dev.1
+stemcells:
+- alias: default
+  os: ubuntu-resolute
+  version: "0.184"
+update:
+  canaries: 1
+  canary_watch_time: 30000-120000
+  max_in_flight: 1
+  serial: true
+  update_watch_time: 30000-120000

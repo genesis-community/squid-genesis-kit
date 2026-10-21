@@ -1,0 +1,62 @@
+azs:
+- name: z1
+  cloud_properties:
+    node: pve-a
+- name: z2
+  cloud_properties:
+    node: pve-b
+
+vm_types:
+- name: squid
+  cloud_properties:
+    cpu: 2
+    ram: 2048
+    disk: 16384
+    network_bridge: vmbr0
+- name: test-vm-type
+  cloud_properties:
+    cpu: 2
+    ram: 2048
+    disk: 16384
+    network_bridge: vmbr0
+- name: default
+  cloud_properties:
+    cpu: 2
+    ram: 2048
+    disk: 16384
+    network_bridge: vmbr0
+
+networks:
+- name: squid
+  type: manual
+  subnets:
+  - range: 10.99.0.0/16
+    gateway: 10.99.0.1
+    azs: [z1, z2]
+    dns:
+    - test-dns
+    reserved: [ 10.99.0.1 - 10.99.0.15 ]
+    static: [ 10.99.0.16 - 10.99.0.30 ]
+    cloud_properties:
+      bridge: vmbr0
+- name: test-network
+  type: manual
+  subnets:
+  - range: 10.99.0.0/16
+    gateway: 10.99.0.1
+    azs: [z1, z2]
+    dns:
+    - test-dns
+    reserved: [ 10.99.0.1 - 10.99.0.15 ]
+    static: [ 10.99.0.16 - 10.99.0.30 ]
+    cloud_properties:
+      bridge: vmbr0
+- name: vip
+  type: vip
+
+compilation:
+  workers: 5
+  reuse_compilation_vms: true
+  az: z1
+  vm_type: default
+  network: default

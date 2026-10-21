@@ -1,0 +1,22 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features: []
+
+genesis:
+  env:      base-all-params
+  bosh_env: some-other-env
+  entomb:   false
+
+params:
+  port: "8080"
+  network: test-network
+  vm_type: test-vm-type
+  availability_zones:
+    - z2
+  stemcell_os: ubuntu-jammy
+  stemcell_version: 9.9.9
+  acl: |
+    acl localnet src 10.99.0.0/16
+    http_access allow localnet

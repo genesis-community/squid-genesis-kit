@@ -1,86 +1,64 @@
-Squid Genesis Kit
-=================
+# Squid Genesis Kit
 
-This Genesis kit deploys a single, standalone
-[Squid Caching Web Proxy][squid], running on the standard port,
-TCP/3128.
+This Genesis kit deploys a single, standalone [Squid caching web proxy](http://www.squid-cache.org/) on the standard port, TCP 3128.
 
-[squid]: http://www.squid-cache.org/
+The proxy gives deployments a way to send Internet-bound HTTP and HTTPS traffic out when their own networks have little or no direct outbound access. You deploy it into a DMZ-style network that does have egress, and the deployments inside the restricted network send their requests through it.
 
-This allows egress Internet-bound HTTP and HTTPS traffic for
-deployments whose network zones have little to no direct outbound
-access themselves.
+That helps in several situations:
 
-The proxy deployment can be deployed into a DMZ-style network,
-which _does_ have egress Internet access, in order to proxy out
-requests from inside the network safely and securely.
+- BOSH directors in restricted networks can download stemcells and releases.
 
-This is useful in various scenarios:
-- For BOSH directors to download stemcells and releases in restricted networks
-- For Cloud Foundry deployments to retrieve online buildpacks
-- For development environments that need controlled internet access
-- For compliance and security requirements where internet traffic must be filtered
-- For any deployment that requires HTTP/HTTPS access in air-gapped environments
+- Cloud Foundry can fetch online buildpacks.
+
+- Development environments get controlled Internet access.
+
+- Compliance rules that require filtered Internet traffic have one place to enforce it.
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌────────────┐
-│                 │     │              │     │            │
-│  Restricted     │     │  Squid Proxy │     │  External  │
-│  Network        ├────►│  (3128)      ├────►│  Internet  │
-│                 │     │              │     │            │
-└─────────────────┘     └──────────────┘     └────────────┘
-       │                                            ▲
-       │                                            │
-       │                                            │
-       └────────────────────────────────────────────┘
-                      Blocked Direct Path
+```mermaid
+flowchart LR
+  restricted["Restricted network"] -->|"port 3128"| squid["Squid proxy"]
+  squid --> internet["External Internet"]
+  restricted -. "direct path blocked" .-x internet
 ```
 
-Quick Start
------------
+## Quick start
 
-To use it, you don't even need to clone this repository! Just run
-the following (using Genesis 2.7.0 or later):
+You need Genesis 3.1.0 or later, and you don't need to clone this repository. Create a deployment repo with one of these commands:
 
 ```
-# create a squid-deployments repo using the latest version of the squid kit
+# a squid-deployments repo on the latest squid kit
 genesis init --kit squid
 
-# create a squid-deployments repo using v1.2.0 of the squid kit
+# a squid-deployments repo on a given version of the kit
 genesis init --kit squid/1.2.0
 
-# create a my-squid-configs repo using the latest version of the squid kit
+# a my-squid-configs repo on the latest squid kit
 genesis init --kit squid -d my-squid-configs
 ```
 
-After creating your deployment repo, create a new environment and deploy:
+Then create an environment and deploy it:
 
 ```
-# Create a new environment file for deployment
 cd squid-deployments
-genesis new my-environment
-
-# Deploy the Squid proxy
-genesis deploy my-environment
+genesis new my-env
+genesis deploy my-env
 ```
 
-Once deployed, you can get information about the proxy, including its IP address:
+Once it's deployed, `genesis info` prints the proxy's address and the environment variables that point a shell at it:
 
 ```
-# Get deployment information and proxy URL
-genesis info my-environment
+genesis my-env info
 ```
 
-To test that your proxy is working correctly:
+To check that the proxy works, send a request through it with the `curl` addon:
 
 ```
-# Test proxy connectivity
-genesis my-environment do -- curl https://www.google.com
+genesis my-env do curl -- -sI https://www.google.com
 ```
 
-Finally, configure other deployments to use your proxy by adding these parameters:
+Finally, point your BOSH and Cloud Foundry deployments at the proxy by adding these parameters to their environment files, and redeploy them:
 
 ```
 params:
@@ -88,20 +66,15 @@ params:
   https_proxy: http://proxy-ip:3128
 ```
 
-to your BOSH and Cloud Foundry Genesis deployments, and then
-re-deploy them to start using the new proxy.
+## Stemcells
 
+The kit deploys on the `ubuntu-xenial` stemcell with squid 1.1.0 by default. To deploy on `ubuntu-resolute`, turn on the `resolute` feature, which also swaps in squid 2.0.0, a release that builds Squid 7.7. The [manual](MANUAL.md#resolute) explains why the two go together.
 
-Heads Up!
----------
+## Heads up
 
-If you use the `http_proxy` and `https_proxy` parameters in your
-manifests, you will have to actively manage the `no_proxy`
-parameter as well. Otherwise **all** traffic will be forwarded
-through the proxy, which is rarely ideal.
+When you set `http_proxy` and `https_proxy` in a manifest, you also have to manage `no_proxy`. Otherwise all HTTP and HTTPS traffic goes through the proxy, which is rarely what you want.
 
-For example, if you are leveraging a proxy in a BOSH director,
-your Genesis env file may look like this:
+For example, a BOSH director's environment file might look like this:
 
 ```
 params:
@@ -110,13 +83,9 @@ params:
   https_proxy: http://proxy-ip:3128
 ```
 
-This will send all HTTP/HTTPS traffic through the proxy. This
-includes API traffic that ought to go to your IaaS (like vCenter),
-as well as traffic bound for the local blobstore. This can cause
-hard-to-diagnose issues.
+That sends every HTTP and HTTPS request through the proxy, including the API traffic that should go straight to your IaaS (such as vCenter) and the traffic bound for the local blobstore. The resulting failures are hard to diagnose.
 
-To combat this, specify your BOSH VM IPs, including loopback, in
-the `no_proxy` parameter:
+To avoid that, list the director's own addresses, including loopback, in `no_proxy`:
 
 ```
 params:
@@ -126,52 +95,35 @@ params:
   no_proxy:    10.10.100.1,127.0.0.1,localhost
 ```
 
-Now, HTTP/HTTPS traffic from the BOSH host _to_ the BOSH host
-will ignore the proxy and connect directly.
+Traffic from the director to itself now skips the proxy and connects directly.
 
-For cloud provider deployments, you should typically also include the API endpoints 
-in your `no_proxy` setting:
+On a cloud provider, you should usually add the provider's API endpoints to `no_proxy` as well:
 
 ```
-# For AWS
+# AWS
 no_proxy: 10.10.100.1,127.0.0.1,localhost,169.254.169.254,*.amazonaws.com
 
-# For GCP
+# GCP
 no_proxy: 10.10.100.1,127.0.0.1,localhost,metadata.google.internal,*.googleapis.com
 
-# For Azure
+# Azure
 no_proxy: 10.10.100.1,127.0.0.1,localhost,169.254.169.254,*.azure.com
 ```
 
-Troubleshooting
---------------
+## Troubleshooting
 
-### Common Issues
+When you can't connect to the proxy, check that the proxy's address is reachable, that port 3128 is open, and that your security groups or firewall rules allow traffic to it.
 
-1. **Cannot connect to the proxy**:
-   - Verify network connectivity to the proxy IP address (`ping proxy-ip`)
-   - Check that port 3128 is accessible (`telnet proxy-ip 3128`)
-   - Ensure your network security groups/firewall allow traffic on port 3128
+When the proxy returns errors, confirm that it's running with `genesis my-env bosh instances`, read its logs with `genesis my-env bosh logs squid/0`, and check that the ACL allows your source address.
 
-2. **Proxy returns errors**:
-   - Verify the proxy is running (`genesis my-environment instances`)
-   - Check proxy logs (`genesis my-environment logs squid/0`)
-   - Ensure the ACL allows your source IP address
+When traffic doesn't go through the proxy at all, check that `http_proxy` and `https_proxy` are set in the client's environment. Some applications ignore those variables and need their own proxy settings.
 
-3. **Traffic not going through proxy**:
-   - Verify environment variables are set correctly (`echo $http_proxy`)
-   - Some applications may need to be explicitly configured to use a proxy
-   - Check for conflicting proxy settings in your environment
-
-For more advanced troubleshooting, you can SSH into the proxy VM:
+For deeper digging, you can SSH into the proxy VM:
 
 ```
-genesis my-environment ssh squid/0
+genesis my-env bosh ssh squid/0
 ```
 
-Learn More
-----------
+## Learn more
 
-For more in-depth documentation, check out the [manual][1].
-
-[1]: MANUAL.md
+The [manual](MANUAL.md) covers every parameter, the features, the deploy-time checks, and more ACL examples.

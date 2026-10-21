@@ -1,0 +1,11 @@
+---
+kit:
+  name:    dev
+  version: latest
+  features: []
+
+genesis:
+  env:    base
+  entomb: false
+
+params: {}

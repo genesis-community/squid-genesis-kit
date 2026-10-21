@@ -1,0 +1,10 @@
+---
+# squid 1.1.0 builds Squid 4.10 and starts it with chpst.  It stays the
+# default, because Squid 7 in squid 2.0.0 needs a C++17 compiler, which the
+# default ubuntu-xenial stemcell does not have.  The resolute feature swaps in
+# squid 2.0.0 through manifests/releases/squid-resolute.yml.
+releases:
+- name:    squid
+  version: 1.1.0
+  url:     https://github.com/cloudfoundry-community/squid-boshrelease/releases/download/v1.1.0/squid-1.1.0.tgz
+  sha1:    61848d550902a159efdc6f3e2d24291d53d65b76

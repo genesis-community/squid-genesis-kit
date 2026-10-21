@@ -11,13 +11,12 @@ use parent qw(Genesis::Hook::CloudConfig);
 
 use Genesis::Hook::CloudConfig::Helpers qw/gigabytes megabytes/;
 
-use Genesis qw//;
-use JSON::PP;
+use Genesis qw/bail/;
 
 sub init {
   my $class = shift;
   my $obj = $class->SUPER::init(@_);
-  $obj->check_minimum_genesis_version('3.1.0-rc.20');
+  $obj->check_minimum_genesis_version('3.1.0');
   return $obj;
 }
 
@@ -40,6 +39,9 @@ sub perform {
             },
             aws => {
               'subnet' => $self->network_reference('id'),
+            },
+            pve => {
+              'bridge' => $self->_pve_cpi_setting('pve_network_bridge', 'network_bridge', 'vmbr0'),
             },
           },
         },
@@ -72,6 +74,12 @@ sub perform {
               'http_tokens' => 'required'
             }
           },
+          pve => {
+            'cpu'            => scalar($self->env->lookup('bosh-configs.cpi.pve_squid_cpu',  $self->for_scale({ dev => 2, prod => 2 }, 2))),
+            'ram'            => scalar($self->env->lookup('bosh-configs.cpi.pve_squid_ram',  $self->for_scale({ dev => 2048, prod => 4096 }, 2048))),
+            'disk'           => scalar($self->env->lookup('bosh-configs.cpi.pve_squid_disk', $self->for_scale({ dev => 16384, prod => 16384 }, 16384))),
+            'network_bridge' => $self->_pve_cpi_setting('pve_network_bridge', 'network_bridge', 'vmbr0'),
+          },
         },
       ),
     ],
@@ -91,6 +99,10 @@ sub perform {
             'type' => 'gp3',
             'encrypted' => $self->TRUE
           },
+          pve => {
+            'storage'     => $self->_pve_cpi_setting('pve_disk_storage', 'disk_storage', 'local-lvm'),
+            'disk_format' => scalar($self->env->lookup('bosh-configs.cpi.pve_disk_format', 'raw')),
+          },
         },
       ),
     ],
@@ -107,8 +119,23 @@ sub perform {
 
   $self->done($config);
 
-	return 1;
-
+  return 1;
 }
+
+# _pve_cpi_setting - resolve a PVE CPI setting from the env file, then the OCFP vault config, then a default {{{
+sub _pve_cpi_setting {
+  my ($self, $env_key, $vault_key, $default) = @_;
+  my $value = scalar($self->env->lookup("bosh-configs.cpi.$env_key", undef));
+  $value //= scalar($self->env->ocfp_config_lookup("cpi.pve.$vault_key", undef));
+  $value //= $default;
+  bail(
+    "No PVE %s configured for %s: set #c{bosh-configs.cpi.%s} in the ".
+    "environment file, or run #g{ocfp vault populate} so the OCFP config ".
+    "provides #c{cpi/pve:%s}.",
+    $vault_key, $self->env->name, $env_key, $vault_key
+  ) unless defined($value) && length($value);
+  return $value;
+}
+# }}}
 
 1;

@@ -1,0 +1,12 @@
+---
+# OCFP reference architecture names.  The cloud-config hook builds the
+# network and VM type under these names, and the blueprint pins the instance
+# to the network with the subnet's reserved squid_ip.
+meta:
+  ocfp:
+    env:
+      cloud: (( concat genesis.env "." genesis.type "." ))
+
+params:
+  network: (( concat meta.ocfp.env.cloud "net-squid" ))
+  vm_type: (( concat meta.ocfp.env.cloud "vm-squid" ))
