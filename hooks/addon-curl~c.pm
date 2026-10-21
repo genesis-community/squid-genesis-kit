@@ -23,8 +23,10 @@ sub init {
 sub cmd_details {
 	return
 	"Issue raw HTTP requests (via curl) through the Squid proxy, to test reachability.\n".
-	"Arguments after -- are passed to curl as they are.  This requires curl on\n".
-	"your system.";
+	"Every argument is passed to curl as it is, and a leading -- is dropped, so\n".
+	"`do curl -sI URL` and `do curl -- -sI URL` do the same thing.  The request\n".
+	"always goes through the proxy, whatever proxy settings your shell has.  This\n".
+	"requires curl on your system.";
 }
 # }}}
 
@@ -41,15 +43,33 @@ sub perform {
 	my (undef, $rc) = run('command -v curl >/dev/null 2>&1');
 	bail("curl is not installed.  Install curl first.") unless $rc == 0;
 
-	info("http_proxy=%s", $proxy);
-	info("https_proxy=%s", $proxy);
+	info("Sending the request through the proxy at %s.", $proxy);
 	info("");
 
+	# Genesis hands the addon a leading -- when the caller separates the
+	# curl arguments with one, and curl would read it as the end of its
+	# options and then treat -sI as a URL.
+	my @args = @{$self->{args} // []};
+	shift @args if @args && $args[0] eq '--';
+
+	# The proxy is named on the command line, and every proxy variable from
+	# the caller's shell is unset, so NO_PROXY cannot route the request
+	# around Squid and an ALL_PROXY cannot send it somewhere else.  An empty
+	# --noproxy tells curl to use the proxy for every host.
+	my %unset = map {($_ => undef)} qw/
+		http_proxy https_proxy all_proxy no_proxy
+		HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY
+	/;
+
 	# Each argument is passed to curl as its own word, so arguments with
-	# spaces or shell characters reach curl unchanged.
-	local $ENV{http_proxy}  = $proxy;
-	local $ENV{https_proxy} = $proxy;
-	my (undef, $curl_rc) = run({interactive => 1}, 'curl "$@"', @{$self->{args} // []});
+	# spaces or shell characters reach curl unchanged.  They are redacted
+	# from the trace log, because they can hold credentials, such as an
+	# Authorization header or a -u user:password.
+	my (undef, $curl_rc) = run(
+		{interactive => 1, env => \%unset},
+		'curl --proxy "$1" --noproxy "" "${@:2}"',
+		$proxy, map {{redact => $_}} @args
+	);
 
 	return $self->done($curl_rc == 0 ? 1 : 0);
 }

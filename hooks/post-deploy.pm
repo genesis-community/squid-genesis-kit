@@ -31,7 +31,7 @@ sub perform {
 	info("  #G{$ENV{GENESIS_CALL_ENV} info}");
 	info("");
 	info("To test the proxy, run");
-	info("  #G{$ENV{GENESIS_CALL_ENV} do curl -- -sI https://www.google.com}");
+	info("  #G{$ENV{GENESIS_CALL_ENV} do curl -sI https://www.google.com}");
 
 	return $self->done(1);
 }
